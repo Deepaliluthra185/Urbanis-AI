@@ -66,13 +66,23 @@ export default function SiteValidationPage() {
   const [projName, setProjName] = useState("");
 
   useEffect(() => {
-    loadProject(id).then((p) => {
-      setProjName(p.name);
-      if (p.site?.polygon) {
-        setResult({ status: p.site.status, veto_reason: p.site.veto_reason, area_m2: p.site.area_m2, perimeter_m: p.site.perimeter_m });
-        setLabel(p.site.label);
-      }
-    });
+    loadProject(id)
+      .then((p) => {
+        if (!p) return;
+        setProjName(p.name || "");
+        if (p.site?.polygon) {
+          setResult({
+            status: p.site.status,
+            veto_reason: p.site.veto_reason,
+            area_m2: p.site.area_m2,
+            perimeter_m: p.site.perimeter_m,
+          });
+          setLabel(p.site.label);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load project:", err);
+      });
   }, [id, loadProject]);
 
   const renderPolygon = useCallback((latlngs, res) => {

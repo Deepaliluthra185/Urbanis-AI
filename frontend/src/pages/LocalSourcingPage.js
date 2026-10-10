@@ -13,7 +13,16 @@ export default function LocalSourcingPage() {
   const [type, setType] = useState("All");
 
   useEffect(() => {
-    api.get("/suppliers").then(({ data }) => { setSuppliers(data); setLoading(false); });
+    api
+      .get("/suppliers")
+      .then(({ data }) => {
+        setSuppliers(data || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load suppliers:", err);
+        setLoading(false);
+      });
   }, []);
 
   const types = ["All", ...Array.from(new Set(suppliers.map((s) => s.type)))];

@@ -27,7 +27,13 @@ export default function AiFormulationPage() {
   const [projName, setProjName] = useState("");
 
   useEffect(() => {
-    loadProject(id).then((p) => { setProjName(p.name); setResults(p.agents || {}); });
+    loadProject(id)
+      .then((p) => {
+        if (!p) return;
+        setProjName(p.name || "");
+        setResults(p.agents || {});
+      })
+      .catch((err) => console.error("AiFormulationPage load error:", err));
   }, [id, loadProject]);
 
   const execute = async (agentId) => {

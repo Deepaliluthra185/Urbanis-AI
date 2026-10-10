@@ -29,10 +29,15 @@ export default function DashboardPage() {
 
   const load = async () => {
     setLoading(true);
-    const [s, p] = await Promise.all([api.get("/dashboard"), api.get("/projects")]);
-    setStats(s.data);
-    setProjects(p.data);
-    setLoading(false);
+    try {
+      const [s, p] = await Promise.all([api.get("/dashboard"), api.get("/projects")]);
+      setStats(s.data);
+      setProjects(p.data || []);
+    } catch (err) {
+      console.error("Dashboard load failed:", err);
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, []);
 

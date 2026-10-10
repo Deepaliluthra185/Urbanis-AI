@@ -28,17 +28,20 @@ export default function DesignCostingPage() {
   const saveTimer = useRef(null);
 
   useEffect(() => {
-    api.get("/catalog").then(({ data }) => setCatalog(data));
-    loadProject(id).then((p) => {
-      setProjName(p.name);
-      setApproved(p.site?.status === "approved");
-      const grid = Array(CELLS).fill(null);
-      (p.design?.modules || []).forEach((m, i) => {
-        const cell = m.cell != null ? m.cell : i;
-        grid[cell] = { uid: UID++, module_id: m.module_id, material: m.material, cell };
-      });
-      setCells(grid);
-    });
+    api.get("/catalog").then(({ data }) => setCatalog(data)).catch((err) => console.error("Catalog load failed:", err));
+    loadProject(id)
+      .then((p) => {
+        if (!p) return;
+        setProjName(p.name || "");
+        setApproved(p.site?.status === "approved");
+        const grid = Array(CELLS).fill(null);
+        (p.design?.modules || []).forEach((m, i) => {
+          const cell = m.cell != null ? m.cell : i;
+          grid[cell] = { uid: UID++, module_id: m.module_id, material: m.material, cell };
+        });
+        setCells(grid);
+      })
+      .catch((err) => console.error("Project load failed:", err));
     // eslint-disable-next-line
   }, [id]);
 
@@ -49,14 +52,14 @@ export default function DesignCostingPage() {
     let cost = 0, carbon = 0, area = 0;
     const placed = cells.filter(Boolean);
     placed.forEach((c) => {
-      const mod = modByIdStatic(catalog.modules, c.module_id);
-      const mat = matByIdStatic(catalog.materials, c.material);
+      const mod = catalog.modules?.find((m) => m.id === c.module_id);
+      const mat = catalog.materials?.find((m) => m.id === c.material);
       if (!mod || !mat) return;
       cost += mod.base_cost + mod.area * mat.cost_per_m2;
       carbon += mod.area * mat.carbon_per_m2;
       area += mod.area;
     });
-    const benchmark = area * catalog.benchmark_carbon;
+    const benchmark = area * (catalog.benchmark_carbon || 350);
     return {
       cost, carbon, area, units: placed.length, benchmark,
       saving: benchmark > 0 ? Math.round((1 - carbon / benchmark) * 100) : 0,
