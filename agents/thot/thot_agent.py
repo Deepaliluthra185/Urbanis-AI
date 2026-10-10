@@ -189,56 +189,163 @@ class ThotAgent:
     # Assessment — Seismic Zone (BIS IS 1893:2016)
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # BIS IS 1893:2016 metadata lookup — enriches real dataset which only
+    # carries zone name + intensity label (no engineering parameters)
+    # ------------------------------------------------------------------
+    _BIS_ZONE_META: Dict[str, Dict] = {
+        "Zone II": {
+            "zone_number": 2,
+            "zone_factor_Z": 0.10,
+            "pga_g": 0.10,
+            "intensity": "V–VI (MSK Scale)",
+            "description": (
+                "Low Damage Risk Zone — stable cratonic regions. Covers most of "
+                "peninsular India, southern Karnataka, Tamil Nadu interior, and "
+                "Andhra plateau."
+            ),
+            "design_recommendation": (
+                "Standard IS 456:2000 RCC design. Basic seismic detailing per "
+                "IS 13920 recommended for buildings >4 storeys."
+            ),
+        },
+        "Zone III": {
+            "zone_number": 3,
+            "zone_factor_Z": 0.16,
+            "pga_g": 0.16,
+            "intensity": "VI–VII (MSK Scale)",
+            "description": (
+                "Moderate Damage Risk Zone — covers Rajasthan plains, central MP, "
+                "Bihar, eastern UP, coastal Andhra, and parts of Maharashtra Deccan."
+            ),
+            "design_recommendation": (
+                "IS 456 RCC with IS 13920 ductile detailing for buildings >4 storeys "
+                "or irregular configurations. Liquefaction check near river channels."
+            ),
+        },
+        "Zone IV": {
+            "zone_number": 4,
+            "zone_factor_Z": 0.24,
+            "pga_g": 0.24,
+            "intensity": "VII–VIII (MSK Scale)",
+            "description": (
+                "High (Severe) Damage Risk Zone — Indo-Gangetic alluvial plains of "
+                "Punjab, Haryana, Delhi NCT, HP Siwalik foothills, and NW Uttar Pradesh. "
+                "Amritsar, Ludhiana, Chandigarh, Delhi all fall here."
+            ),
+            "design_recommendation": (
+                "IS 13920 ductile detailing mandatory for all multi-storey RC frames. "
+                "Response Spectrum Method mandatory for buildings >15m. Liquefaction "
+                "assessment required in saturated alluvial zones near rivers."
+            ),
+        },
+        "Zone V": {
+            "zone_number": 5,
+            "zone_factor_Z": 0.36,
+            "pga_g": 0.36,
+            "intensity": "IX and above (MSK Scale)",
+            "description": (
+                "Very High (Very Severe) Damage Risk Zone — J&K highlands, Ladakh, "
+                "extreme HP, NE India (Assam, Manipur), Andaman & Nicobar Islands. "
+                "Highest seismicity in India — Himalayan convergence zone."
+            ),
+            "design_recommendation": (
+                "IS 13920 mandatory with base isolation for critical infrastructure. "
+                "Site-specific response spectra required. Avoid soft/weak storey. "
+                "Both seismic coefficient and RSM mandatory."
+            ),
+        },
+    }
+
+    # Mapping from real GeoJSON seismic_zo field → standard zone key
+    _SEISMIC_ZO_MAP: Dict[str, str] = {
+        "Seismic Zone-II":  "Zone II",
+        "Seismic Zone-III": "Zone III",
+        "Seismic Zone-IV":  "Zone IV",
+        "Seismic Zone-V":   "Zone V",
+        # fallback — in case the file uses short form
+        "Zone-II":  "Zone II",
+        "Zone-III": "Zone III",
+        "Zone-IV":  "Zone IV",
+        "Zone-V":   "Zone V",
+        # already-normalised form (mock dataset)
+        "Zone II":  "Zone II",
+        "Zone III": "Zone III",
+        "Zone IV":  "Zone IV",
+        "Zone V":   "Zone V",
+    }
+
+    def _normalise_zone_key(self, props: Dict) -> Optional[str]:
+        """
+        Extract and normalise the seismic zone key from a feature's properties.
+        Handles both real dataset format (seismic_zo) and mock format (zone).
+        Returns None if the feature has no zone classification (null features).
+        """
+        raw = props.get("seismic_zo") or props.get("zone")
+        if raw is None:
+            return None
+        return self._SEISMIC_ZO_MAP.get(str(raw).strip(), None)
+
     def _assess_seismic_zone(self, lat: float, lon: float) -> Dict[str, Any]:
         """Classify site seismic hazard per BIS IS 1893:2016."""
-        matches = self._query_feature_collection(lat, lon, self._seismic_fc)
+        all_matches = self._query_feature_collection(lat, lon, self._seismic_fc)
 
-        if matches:
-            # If multiple zones overlap (edge cases), prefer the highest zone number
+        # Filter out the 156 null-zone features present in the real dataset
+        # (those are misc administrative/boundary polygons with no zone label)
+        zone_matches = [
+            (m, self._normalise_zone_key(m))
+            for m in all_matches
+            if self._normalise_zone_key(m) is not None
+        ]
+
+        if zone_matches:
             _priority = {"Zone V": 5, "Zone IV": 4, "Zone III": 3, "Zone II": 2, "Zone I": 1}
-            match = max(matches, key=lambda m: _priority.get(m.get("zone", "Zone II"), 2))
+            # Pick the highest-severity zone if point is in multiple polygons
+            props, zone_key = max(zone_matches, key=lambda t: _priority.get(t[1], 0))
+            meta = self._BIS_ZONE_META.get(zone_key, {})
+
             return {
-                "zone": match.get("zone"),
-                "zone_number": match.get("zone_number"),
-                "bis_standard": match.get("bis_code", "IS 1893:2016"),
-                "zone_factor_Z": match.get("zone_factor_Z"),
-                "peak_ground_acceleration_g": match.get("pga_g"),
-                "seismic_intensity": match.get("intensity"),
-                "description": match.get("description"),
-                "design_recommendation": match.get("design_recommendation"),
-                "key_districts": match.get("key_districts", []),
-                "historical_events": match.get("historical_events", []),
+                "zone": zone_key,
+                "zone_number": meta.get("zone_number"),
+                "bis_standard": props.get("bis_code", "IS 1893:2016 (Part 1)"),
+                "zone_factor_Z": meta.get("zone_factor_Z"),
+                "peak_ground_acceleration_g": meta.get("pga_g"),
+                "seismic_intensity": (
+                    props.get("intensity_")          # real dataset field name
+                    or props.get("intensity")        # mock dataset field name
+                    or meta.get("intensity")         # fallback from lookup
+                ),
+                "description": props.get("description") or meta.get("description"),
+                "design_recommendation": (
+                    props.get("design_recommendation") or meta.get("design_recommendation")
+                ),
+                "key_districts": props.get("key_districts", []),
+                "historical_events": props.get("historical_events", []),
                 "data_source": (
-                    "BIS IS 1893 (Part 1): 2016 — Criteria for Earthquake Resistant "
-                    "Design of Structures (Sixth Revision)"
+                    "BIS IS 1893 (Part 1): 2016 — Real GeoJSON dataset "
+                    "(Seismic_Zones.geojson, 173 features, all-India coverage)"
                 ),
                 "confidence": "HIGH",
             }
 
-        # Default fallback — point outside classified North India polygons
+        # Fallback — point not inside any classified seismic polygon
         logger.info(
-            "THOT: Seismic zone not matched for (%.4f, %.4f) — defaulting to Zone II", lat, lon
+            "THOT: No seismic zone matched for (%.4f, %.4f) — defaulting to Zone II", lat, lon
         )
+        meta = self._BIS_ZONE_META["Zone II"]
         return {
             "zone": "Zone II",
-            "zone_number": 2,
-            "bis_standard": "IS 1893:2016",
-            "zone_factor_Z": 0.10,
-            "peak_ground_acceleration_g": 0.10,
-            "seismic_intensity": "V–VI (MSK Scale)",
-            "description": (
-                "Low Damage Risk Zone — site falls outside the classified high-risk "
-                "seismic corridors of North India. Stable cratonic region."
-            ),
-            "design_recommendation": (
-                "Standard IS 456:2000 RCC design. Basic seismic detailing per IS 13920 "
-                "recommended for buildings >4 storeys. No mandatory ductile frame."
-            ),
+            "zone_number": meta["zone_number"],
+            "bis_standard": "IS 1893:2016 (Part 1)",
+            "zone_factor_Z": meta["zone_factor_Z"],
+            "peak_ground_acceleration_g": meta["pga_g"],
+            "seismic_intensity": meta["intensity"],
+            "description": meta["description"],
+            "design_recommendation": meta["design_recommendation"],
             "key_districts": [],
             "historical_events": [],
             "data_source": (
-                "BIS IS 1893 (Part 1): 2016 — fallback default (site outside "
-                "North India classified polygon coverage)"
+                "BIS IS 1893 (Part 1): 2016 — fallback (site outside all classified polygons)"
             ),
             "confidence": "LOW",
         }
