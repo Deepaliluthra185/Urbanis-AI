@@ -12,6 +12,24 @@ import AiFormulationPage from "./pages/AiFormulationPage";
 import ProjectSummaryPage from "./pages/ProjectSummaryPage";
 import LocalSourcingPage from "./pages/LocalSourcingPage";
 
+console.log("[App.js Diagnostics]", {
+  AuthProvider: typeof AuthProvider,
+  ProjectProvider: typeof ProjectProvider,
+  BrowserRouter: typeof BrowserRouter,
+  Routes: typeof Routes,
+  Route: typeof Route,
+  Navigate: typeof Navigate,
+  LoginPage: typeof LoginPage,
+  ProtectedRoute: typeof ProtectedRoute,
+  DashboardPage: typeof DashboardPage,
+  SiteValidationPage: typeof SiteValidationPage,
+  DesignCostingPage: typeof DesignCostingPage,
+  AiFormulationPage: typeof AiFormulationPage,
+  ProjectSummaryPage: typeof ProjectSummaryPage,
+  LocalSourcingPage: typeof LocalSourcingPage,
+  Toaster: typeof Toaster,
+});
+
 function App() {
   return (
     <div className="App">

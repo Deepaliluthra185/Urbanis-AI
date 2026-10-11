@@ -10,8 +10,10 @@ import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "../components/ui/dialog";
+import { INDIAN_STATES_CITIES } from "../data/indianLocations";
 
 const PRESETS = [
+  { name: "Punjab Heritage Quad", location: "Amritsar, Punjab", description: "Sustainable modular housing block within Amritsar municipal corridor.", population: "Multi-generational families & craft community" },
   { name: "Urbanis Modular Quad", location: "Bengaluru, India", description: "48-unit low-carbon modular timber quad on a cleared inner-city parcel.", population: "Young professionals & tech workforce" },
   { name: "Harbor Eco-Terrace", location: "Navi Mumbai, India", description: "Terraced modular housing near coastal development district with eco-protection buffers.", population: "Mixed-income municipal workers" },
   { name: "Riverfront Veto Test", location: "Yamuna Floodplain, Delhi, India", description: "Speculative riverfront parcel — intersects the 100-year municipal flood zone.", population: "Demonstration parcel" },
@@ -26,6 +28,8 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", location: "", description: "", population: "" });
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -84,21 +88,109 @@ export default function DashboardPage() {
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <button
-                className="flex items-center gap-2 bg-zinc-100 text-black font-semibold text-sm px-5 py-3 hover:bg-white transition-colors self-start"
+                type="button"
+                onClick={() => setOpen(true)}
+                className="flex items-center gap-2 bg-zinc-100 text-black font-semibold text-sm px-5 py-3 hover:bg-white transition-colors self-start cursor-pointer"
                 data-testid="new-project-btn"
               >
                 <Plus className="w-4 h-4" /> New Project
               </button>
             </DialogTrigger>
-            <DialogContent className="bg-[#121215] border-zinc-800 text-zinc-100 rounded-none sm:max-w-md">
+            <DialogContent className="bg-[#121215] border-zinc-800 text-zinc-100 rounded-none sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle className="font-display tracking-tight text-2xl">New Housing Project</DialogTitle>
-                <DialogDescription className="text-zinc-500 text-xs font-mono">Define the parcel context to begin the 4-step workflow.</DialogDescription>
+                <DialogDescription className="text-zinc-500 text-xs font-mono">Define parcel context and choose region to begin the 4-step workflow.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <Input label="Project name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} testid="project-name-input" placeholder="Urbanis Modular Quad" />
-                <Input label="Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} testid="project-location-input" placeholder="Bengaluru, India" />
-                <Input label="Target population" value={form.population} onChange={(v) => setForm({ ...form, population: v })} testid="project-population-input" placeholder="Young families" />
+
+                {/* Indian State & City Region Selector */}
+                <div className="bg-[#09090b] border border-zinc-800 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="eyebrow flex items-center gap-1.5 text-zinc-300">
+                      <MapPin className="w-3.5 h-3.5 text-zinc-100" /> Regional Dropdown (India)
+                    </span>
+                    {(selectedState || selectedCity) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedState("");
+                          setSelectedCity("");
+                          setForm({ ...form, location: "" });
+                        }}
+                        className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 underline"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block">
+                        <span className="text-[11px] font-mono text-zinc-400 block mb-1">State / UT</span>
+                        <select
+                          value={selectedState}
+                          onChange={(e) => {
+                            const st = e.target.value;
+                            setSelectedState(st);
+                            setSelectedCity("");
+                            if (st) {
+                              setForm({ ...form, location: `${st}, India` });
+                            }
+                          }}
+                          data-testid="state-dropdown"
+                          className="w-full bg-[#121215] border border-zinc-800 focus:border-zinc-500 text-zinc-100 text-xs px-2.5 py-2 outline-none font-mono cursor-pointer"
+                        >
+                          <option value="">-- Select State / UT --</option>
+                          {Object.keys(INDIAN_STATES_CITIES).map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block">
+                        <span className="text-[11px] font-mono text-zinc-400 block mb-1">City / District</span>
+                        <select
+                          value={selectedCity}
+                          disabled={!selectedState}
+                          onChange={(e) => {
+                            const ct = e.target.value;
+                            setSelectedCity(ct);
+                            if (ct && selectedState) {
+                              setForm({ ...form, location: `${ct}, ${selectedState}, India` });
+                            } else if (selectedState) {
+                              setForm({ ...form, location: `${selectedState}, India` });
+                            }
+                          }}
+                          data-testid="city-dropdown"
+                          className="w-full bg-[#121215] border border-zinc-800 focus:border-zinc-500 text-zinc-100 text-xs px-2.5 py-2 outline-none font-mono cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <option value="">{selectedState ? "-- Select City --" : "Select state first"}</option>
+                          {selectedState &&
+                            INDIAN_STATES_CITIES[selectedState]?.map((ct) => (
+                              <option key={ct} value={ct}>
+                                {ct}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <Input
+                  label="Site Location"
+                  value={form.location}
+                  onChange={(v) => setForm({ ...form, location: v })}
+                  testid="project-location-input"
+                  placeholder="Amritsar, Punjab, India (or customize)"
+                />
+                <Input label="Target population" value={form.population} onChange={(v) => setForm({ ...form, population: v })} testid="project-population-input" placeholder="Young families & local workforce" />
                 <div>
                   <span className="eyebrow block mb-1.5">Brief</span>
                   <textarea

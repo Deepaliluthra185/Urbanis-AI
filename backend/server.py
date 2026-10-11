@@ -1,7 +1,11 @@
-from dotenv import load_dotenv
+import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent
+if str(ROOT_DIR.parent) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR.parent))
+
+from dotenv import load_dotenv
 load_dotenv(ROOT_DIR / ".env")
 
 import os
@@ -15,9 +19,9 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
-import auth
-import agents
-from seed_data import MODULES, MATERIALS, REGULATIONS, SUPPLIERS, TRADITIONAL_BENCHMARK_CARBON, compute_totals, material_by_id
+from backend import auth
+from backend import agents
+from backend.seed_data import MODULES, MATERIALS, REGULATIONS, SUPPLIERS, TRADITIONAL_BENCHMARK_CARBON, compute_totals, material_by_id
 
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
