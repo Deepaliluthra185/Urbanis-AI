@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import HeaderNav from "../components/HeaderNav";
 import { useProject } from "../context/ProjectContext";
+import api from "../lib/api";
 import {
   Brain, Scale, LayoutGrid, Calculator, Truck, FileText, Play, Loader2, CircleCheck,
   TriangleAlert, ArrowRight, Sparkles, CircleDot,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AgentErrorModal } from "../components/AgentErrorModal";
 
 const AGENTS = [
   { id: "thot", name: "THOT", role: "Site & Zoning Context", icon: Brain, kind: "text" },
@@ -25,8 +27,12 @@ export default function AiFormulationPage() {
   const [running, setRunning] = useState(null);
   const [runningAll, setRunningAll] = useState(false);
   const [projName, setProjName] = useState("");
+  const [catalog, setCatalog] = useState({ modules: [], materials: [], suppliers: [] });
+  const [errorModal, setErrorModal] = useState({ isOpen: false, agentId: null, agentName: "", result: null });
 
   useEffect(() => {
+    api.get("/catalog").then(({ data }) => setCatalog(data)).catch((err) => console.error("Catalog load failed:", err));
+    api.get("/suppliers").then(({ data }) => setCatalog(prev => ({ ...prev, suppliers: data }))).catch((err) => console.error("Suppliers load failed:", err));
     loadProject(id)
       .then((p) => {
         if (!p) return;
@@ -41,7 +47,11 @@ export default function AiFormulationPage() {
     try {
       const res = await runAgent(id, agentId);
       setResults((prev) => ({ ...prev, [agentId]: res }));
-      if (res.status === "gap") toast.warning(`${agentId.toUpperCase()} — data gap flagged`);
+      if (res.status === "gap") {
+        const agent = AGENTS.find(a => a.id === agentId);
+        setErrorModal({ isOpen: true, agentId, agentName: agent?.name || agentId, result: res });
+        toast.warning(`${agentId.toUpperCase()} — data gap flagged`);
+      }
       return res;
     } catch (e) {
       toast.error(`${agentId.toUpperCase()} failed`);
@@ -49,6 +59,8 @@ export default function AiFormulationPage() {
       setRunning(null);
     }
   };
+
+  const closeErrorModal = () => setErrorModal({ isOpen: false, agentId: null, agentName: "", result: null });
 
   const runAll = async () => {
     setRunningAll(true);
@@ -106,6 +118,15 @@ export default function AiFormulationPage() {
           </button>
         </div>
       </main>
+
+      <AgentErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={closeErrorModal}
+        agentResult={errorModal.result}
+        agentName={errorModal.agentName}
+        catalog={catalog}
+        projectId={id}
+      />
     </div>
   );
 }

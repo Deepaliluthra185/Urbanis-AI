@@ -208,7 +208,8 @@ def chosen_materials(project) -> List[str]:
 async def run_thot(project):
     if not project.get("location") or not project.get("description"):
         return {"status": "gap", "gap": {"institution": "Municipal Planning Office",
-                "reason": "Site location and project brief are required to establish demographic and zoning context."}}
+                "reason": "Site location and project brief are required to establish demographic and zoning context.",
+                "missing_materials": []}}
     site = project.get("site", {})
     prompt = (
         f"Project: {project['name']}\nLocation: {project['location']}\n"
@@ -231,7 +232,8 @@ def run_kael(project):
                 "output": "Construction blocked by flood/ecological prohibition.", "citations": cite}
     if site.get("status") != "approved":
         return {"status": "gap", "gap": {"institution": "GIS / Cadastral Authority",
-                "reason": "Parcel must pass Site Validation before regulatory codes can be resolved."}}
+                "reason": "Parcel must pass Site Validation before regulatory codes can be resolved.",
+                "missing_materials": []}}
     mats = chosen_materials(project)
     cites = [r for r in REGULATIONS if "materials" not in r or any(m in r["materials"] for m in mats)]
     return {"status": "complete", "confidence": 0.97, "citations": cites,
@@ -242,7 +244,8 @@ async def run_iris(project):
     modules = project.get("design", {}).get("modules", [])
     if not modules:
         return {"status": "gap", "gap": {"institution": "Design Studio Input",
-                "reason": "No modular components placed. Add modules on the Design & Costing canvas to synthesise layouts."}}
+                "reason": "No modular components placed. Add modules on the Design & Costing canvas to synthesise layouts.",
+                "missing_materials": []}}
     counts = {}
     for m in modules:
         mod = next((x for x in MODULES if x["id"] == m["module_id"]), None)
@@ -264,16 +267,20 @@ def run_cronos(project):
     totals = project.get("design", {}).get("totals")
     if not totals or not project.get("design", {}).get("modules"):
         return {"status": "gap", "gap": {"institution": "Quantity Surveyor Input",
-                "reason": "No design costed yet. Complete the Design & Costing step to generate the bill of quantities."}}
+                "reason": "No design costed yet. Complete the Design & Costing step to generate the bill of quantities.",
+                "missing_materials": []}}
     return {"status": "complete", "confidence": 1.0, "totals": totals,
             "output": f"Bill of quantities computed: ₹ {totals['total_cost']:,.0f} CapEx across {totals['units']} modules ({totals['floor_area']:.0f} m2)."}
 
 
 def run_terra(project):
     mats = chosen_materials(project)
+    all_materials = [m["id"] for m in MATERIALS]
+    missing_materials = [m for m in all_materials if m not in mats]
     if not mats:
         return {"status": "gap", "gap": {"institution": "Procurement / Logistics",
-                "reason": "Select materials on the Design step so certified local suppliers can be matched."}}
+                "reason": "Select materials on the Design step so certified local suppliers can be matched.",
+                "missing_materials": missing_materials}}
     matched = [s for s in SUPPLIERS if any(m in s["materials"] for m in mats)]
     totals = project.get("design", {}).get("totals", {}) or {}
     return {"status": "complete", "confidence": 0.95, "suppliers": matched,
@@ -285,7 +292,8 @@ async def run_lyra(project, agent_outputs):
     missing = [a for a in required if agent_outputs.get(a, {}).get("status") != "complete"]
     if missing:
         return {"status": "gap", "gap": {"institution": "Documentation Office",
-                "reason": f"Cannot compile dossier — upstream agents incomplete: {', '.join(x.upper() for x in missing)}."}}
+                "reason": f"Cannot compile dossier — upstream agents incomplete: {', '.join(x.upper() for x in missing)}.",
+                "missing_materials": []}}
     totals = project.get("design", {}).get("totals", {})
     prompt = (
         f"Project {project['name']} in {project['location']}. Site approved. "
