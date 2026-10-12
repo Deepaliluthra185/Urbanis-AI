@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-10-12T06:56:27.533372+00:00",
+  "hardware": {
+    "device": "cpu",
+    "pytorch_version": "2.14.1+cpu",
+    "cuda_available": false,
+    "pynvml_status": {
+      "available": false,
+      "device_count": 0,
+      "devices": [],
+      "error": "NVMLError_LibraryNotFound: NVML Shared Library Not Found"
+    }
+  },
+  "workload": {
+    "iterations": 50,
+    "batch_size": 16,
+    "sequence_length": 64,
+    "embedding_dimension": 512,
+    "total_items_processed": 800
+  },
+  "latency": {
+    "total_duration_seconds": 0.953,
+    "mean_latency_ms": 19.058,
+    "median_latency_ms": 19.015,
+    "min_latency_ms": 17.101,
+    "max_latency_ms": 23.435,
+    "p95_latency_ms": 20.38,
+    "p99_latency_ms": 23.435,
+    "std_deviation_ms": 1.041,
+    "throughput_items_per_sec": 839.42
+  },
+  "energy_consumption": {
+    "total_energy_kwh": 2.1178613334066338e-05,
+    "total_energy_joules": 76.243,
+    "cpu_energy_kwh": 1.72076233339289e-05,
+    "gpu_energy_kwh": 0.0,
+    "ram_energy_kwh": 3.970990000137439e-06,
+    "average_power_watts": 80.0
+  },
+  "carbon_impact": {
+    "emissions_kg_co2e": 7.31669516616986e-06,
+    "emissions_grams_co2e": 0.007317,
+    "grid_carbon_intensity_kg_per_kwh": 0.713,
+    "equivalencies": {
+      "km_driven_passenger_car": 6.1e-05,
+      "smartphones_charged": 0.0009,
+      "tree_absorption_days": 0.000121
+    }
+  },
+  "financial_cost": {
+    "electricity_cost_usd": 2.54e-06,
+    "electricity_cost_inr": 0.00018,
+    "cloud_compute_cost_usd": 0.000119,
+    "cloud_compute_cost_inr": 0.0103,
+    "total_cost_usd": 0.000122,
+    "total_cost_inr": 0.0105,
+    "tariff_assumptions": {
+      "electricity_rate_usd_kwh": 0.12,
+      "electricity_rate_inr_kwh": 8.5,
+      "cloud_hourly_rate_usd": 0.45
+    }
+  }
+}

@@ -1,0 +1,608 @@
+[
+  {
+    "id": "beas-river-corridor",
+    "name": "Beas River Active Floodplain Corridor (100-Year Return Period)",
+    "river": "Beas River",
+    "type": "flood",
+    "color": "#3b82f6",
+    "label": "BEAS RIVER 100-YEAR ACTIVE FLOODPLAIN",
+    "legalRef": "CWC Flood Demarcation / Municipal Bylaw MB-22.7",
+    "coords": [
+      [
+        32.28,
+        75.52
+      ],
+      [
+        32.25,
+        75.44
+      ],
+      [
+        32.22,
+        75.36
+      ],
+      [
+        32.18,
+        75.36
+      ],
+      [
+        32.15,
+        75.42
+      ],
+      [
+        32.1,
+        75.48
+      ],
+      [
+        31.95,
+        75.52
+      ],
+      [
+        31.8,
+        75.46
+      ],
+      [
+        31.65,
+        75.35
+      ],
+      [
+        31.5,
+        75.25
+      ],
+      [
+        31.35,
+        75.15
+      ],
+      [
+        31.18,
+        75.05
+      ],
+      [
+        31.1,
+        74.92
+      ],
+      [
+        31.15,
+        74.88
+      ],
+      [
+        31.25,
+        75
+      ],
+      [
+        31.42,
+        75.18
+      ],
+      [
+        31.58,
+        75.3
+      ],
+      [
+        31.75,
+        75.4
+      ],
+      [
+        31.9,
+        75.55
+      ],
+      [
+        32.08,
+        75.6
+      ],
+      [
+        32.2,
+        75.5
+      ],
+      [
+        32.28,
+        75.52
+      ]
+    ],
+    "centerline": [
+      [
+        32.26,
+        75.48
+      ],
+      [
+        32.2,
+        75.38
+      ],
+      [
+        32.16,
+        75.42
+      ],
+      [
+        31.92,
+        75.5
+      ],
+      [
+        31.72,
+        75.38
+      ],
+      [
+        31.52,
+        75.24
+      ],
+      [
+        31.3,
+        75.12
+      ],
+      [
+        31.14,
+        74.95
+      ]
+    ],
+    "bufferKm": 1.2
+  },
+  {
+    "id": "ravi-river-corridor",
+    "name": "Ravi River Flood Inundation & Buffer Zone",
+    "river": "Ravi River",
+    "type": "flood",
+    "color": "#0284c7",
+    "label": "RAVI RIVER HIGH-FLOOD CORRIDOR",
+    "legalRef": "Indus Water Treaty Zone / CWC Flood Atlas",
+    "coords": [
+      [
+        32.38,
+        75.62
+      ],
+      [
+        32.28,
+        75.45
+      ],
+      [
+        32.15,
+        75.25
+      ],
+      [
+        32.05,
+        75.1
+      ],
+      [
+        31.9,
+        74.88
+      ],
+      [
+        31.78,
+        74.72
+      ],
+      [
+        31.62,
+        74.6
+      ],
+      [
+        31.48,
+        74.52
+      ],
+      [
+        31.45,
+        74.58
+      ],
+      [
+        31.58,
+        74.68
+      ],
+      [
+        31.72,
+        74.8
+      ],
+      [
+        31.85,
+        74.95
+      ],
+      [
+        32,
+        75.18
+      ],
+      [
+        32.12,
+        75.32
+      ],
+      [
+        32.25,
+        75.52
+      ],
+      [
+        32.38,
+        75.62
+      ]
+    ],
+    "centerline": [
+      [
+        32.35,
+        75.58
+      ],
+      [
+        32.2,
+        75.36
+      ],
+      [
+        32.02,
+        75.14
+      ],
+      [
+        31.84,
+        74.8
+      ],
+      [
+        31.7,
+        74.66
+      ],
+      [
+        31.5,
+        74.55
+      ]
+    ],
+    "bufferKm": 1
+  },
+  {
+    "id": "sutlej-river-corridor",
+    "name": "Sutlej River 100-Year Active Floodplain",
+    "river": "Sutlej River",
+    "type": "flood",
+    "color": "#3b82f6",
+    "label": "SUTLEJ RIVER 100-YEAR FLOODPLAIN",
+    "legalRef": "BBMB Regulations / NDMA Flood Risk Guidelines",
+    "coords": [
+      [
+        31.25,
+        76.5
+      ],
+      [
+        31.05,
+        76.15
+      ],
+      [
+        30.98,
+        75.85
+      ],
+      [
+        30.94,
+        75.55
+      ],
+      [
+        30.98,
+        75.15
+      ],
+      [
+        31.1,
+        74.95
+      ],
+      [
+        31.02,
+        74.82
+      ],
+      [
+        30.85,
+        74.5
+      ],
+      [
+        30.8,
+        74.55
+      ],
+      [
+        30.95,
+        74.88
+      ],
+      [
+        31.05,
+        75.05
+      ],
+      [
+        30.9,
+        75.5
+      ],
+      [
+        30.92,
+        75.8
+      ],
+      [
+        31,
+        76.1
+      ],
+      [
+        31.2,
+        76.48
+      ],
+      [
+        31.25,
+        76.5
+      ]
+    ],
+    "centerline": [
+      [
+        31.22,
+        76.45
+      ],
+      [
+        31.02,
+        76.12
+      ],
+      [
+        30.95,
+        75.82
+      ],
+      [
+        30.95,
+        75.45
+      ],
+      [
+        31.08,
+        74.98
+      ],
+      [
+        30.85,
+        74.52
+      ]
+    ],
+    "bufferKm": 1.5
+  },
+  {
+    "id": "amritsar-drainage-corridor",
+    "name": "Tung Dhab & UBDC Municipal Flood Catchment",
+    "river": "Tung Dhab Canal & Flood Corridor",
+    "type": "flood",
+    "color": "#0ea5e9",
+    "label": "TUNG DHAB URBAN FLOOD CORRIDOR",
+    "legalRef": "Punjab Irrigation Drainage Act / Municipal Bylaw MB-22.7",
+    "coords": [
+      [
+        31.67,
+        74.82
+      ],
+      [
+        31.69,
+        74.85
+      ],
+      [
+        31.68,
+        74.92
+      ],
+      [
+        31.65,
+        74.93
+      ],
+      [
+        31.64,
+        74.88
+      ],
+      [
+        31.63,
+        74.83
+      ],
+      [
+        31.67,
+        74.82
+      ]
+    ],
+    "centerline": [
+      [
+        31.68,
+        74.83
+      ],
+      [
+        31.67,
+        74.88
+      ],
+      [
+        31.65,
+        74.92
+      ]
+    ],
+    "bufferKm": 0.6
+  },
+  {
+    "id": "yamuna-river-corridor",
+    "name": "Yamuna River Active 100-Year Floodplain Corridor",
+    "river": "Yamuna River",
+    "type": "flood",
+    "color": "#3b82f6",
+    "label": "YAMUNA RIVER ACTIVE FLOODPLAIN (DELHI)",
+    "legalRef": "NGT Order 2015 / Delhi Master Plan 2041 / Municipal Bylaw MB-22.7",
+    "coords": [
+      [
+        28.85,
+        77.18
+      ],
+      [
+        28.75,
+        77.22
+      ],
+      [
+        28.66,
+        77.24
+      ],
+      [
+        28.62,
+        77.25
+      ],
+      [
+        28.56,
+        77.29
+      ],
+      [
+        28.48,
+        77.34
+      ],
+      [
+        28.45,
+        77.38
+      ],
+      [
+        28.47,
+        77.4
+      ],
+      [
+        28.54,
+        77.34
+      ],
+      [
+        28.62,
+        77.28
+      ],
+      [
+        28.68,
+        77.27
+      ],
+      [
+        28.78,
+        77.25
+      ],
+      [
+        28.85,
+        77.22
+      ],
+      [
+        28.85,
+        77.18
+      ]
+    ],
+    "centerline": [
+      [
+        28.84,
+        77.2
+      ],
+      [
+        28.72,
+        77.23
+      ],
+      [
+        28.64,
+        77.26
+      ],
+      [
+        28.54,
+        77.32
+      ],
+      [
+        28.46,
+        77.36
+      ]
+    ],
+    "bufferKm": 0.8
+  },
+  {
+    "id": "mithi-river-corridor",
+    "name": "Mithi River Tidal Flood Corridor & Mangrove Buffer",
+    "river": "Mithi River",
+    "type": "flood",
+    "color": "#3b82f6",
+    "label": "MITHI RIVER FLOODPLAIN (CRZ-I BUFFER)",
+    "legalRef": "CRZ Notification 2019 / Maharashtra Coastal Authority",
+    "coords": [
+      [
+        19.14,
+        72.89
+      ],
+      [
+        19.11,
+        72.88
+      ],
+      [
+        19.08,
+        72.87
+      ],
+      [
+        19.05,
+        72.85
+      ],
+      [
+        19.03,
+        72.84
+      ],
+      [
+        19.05,
+        72.86
+      ],
+      [
+        19.09,
+        72.89
+      ],
+      [
+        19.12,
+        72.91
+      ],
+      [
+        19.14,
+        72.89
+      ]
+    ],
+    "centerline": [
+      [
+        19.13,
+        72.89
+      ],
+      [
+        19.09,
+        72.87
+      ],
+      [
+        19.05,
+        72.85
+      ]
+    ],
+    "bufferKm": 0.4
+  },
+  {
+    "id": "sabarmati-river-corridor",
+    "name": "Sabarmati River Active Basin & Flood Corridor",
+    "river": "Sabarmati River",
+    "type": "flood",
+    "color": "#3b82f6",
+    "label": "SABARMATI RIVER FLOODPLAIN CORRIDOR",
+    "legalRef": "Gujarat Disaster Management Act / Municipal Bylaw MB-22.7",
+    "coords": [
+      [
+        23.14,
+        72.6
+      ],
+      [
+        23.08,
+        72.58
+      ],
+      [
+        23.02,
+        72.57
+      ],
+      [
+        22.95,
+        72.55
+      ],
+      [
+        22.92,
+        72.58
+      ],
+      [
+        23,
+        72.6
+      ],
+      [
+        23.07,
+        72.61
+      ],
+      [
+        23.14,
+        72.63
+      ],
+      [
+        23.14,
+        72.6
+      ]
+    ],
+    "centerline": [
+      [
+        23.13,
+        72.61
+      ],
+      [
+        23.05,
+        72.58
+      ],
+      [
+        22.96,
+        72.56
+      ]
+    ],
+    "bufferKm": 0.5
+  }
+]

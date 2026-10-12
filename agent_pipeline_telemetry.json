@@ -1,0 +1,35 @@
+{
+  "pipeline": "UrbanisAI Multi-Agent Pipeline",
+  "timestamp": "2026-10-12T07:02:12.057533+00:00",
+  "agent_latencies_ms": {
+    "THOT (Spatial GIS)": 15.960599994286895,
+    "KAEL (Regulatory Codes)": 0.021700048819184303,
+    "IRIS (Generative Design)": 0.002699904143810272,
+    "CRONOS (CapEx & Budget)": 0.009900075383484364,
+    "TERRA (Carbon & Logistics)": 0.018299906514585018,
+    "LYRA (Dossier Synthesis)": 0.001800013706088066
+  },
+  "total_latency_seconds": 0.016,
+  "energy_consumption": {
+    "total_kwh": 3.5598888838042816e-07,
+    "total_joules": 1.2816,
+    "cpu_kwh": 2.892409718090979e-07,
+    "ram_kwh": 6.674791657133028e-08,
+    "avg_power_watts": 80.0
+  },
+  "carbon_impact": {
+    "emissions_g_co2e": 3e-06,
+    "emissions_kg_co2e": 2.6278408788886916e-09,
+    "car_km_equiv": 0.0,
+    "smartphone_charges": 0.0,
+    "tree_days_equiv": 0.0
+  },
+  "cost": {
+    "electricity_usd": 4e-08,
+    "electricity_inr": 3e-06,
+    "cloud_usd": 2e-06,
+    "cloud_inr": 0.0002,
+    "total_usd": 2e-06,
+    "total_inr": 0.0002
+  }
+}

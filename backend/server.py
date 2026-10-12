@@ -21,6 +21,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from backend import auth
 from backend import agents
+from backend import spatial_index
 from backend.seed_data import MODULES, MATERIALS, REGULATIONS, SUPPLIERS, TRADITIONAL_BENCHMARK_CARBON, compute_totals, material_by_id
 
 mongo_url = os.environ["MONGO_URL"]
@@ -210,34 +211,54 @@ async def run_thot(project):
         return {"status": "gap", "gap": {"institution": "Municipal Planning Office",
                 "reason": "Site location and project brief are required to establish demographic and zoning context.",
                 "missing_materials": []}}
+    # Hybrid Agent Fallback: standard configurations use instant deterministic synthesis (<0.02ms, 0 Joules)
+    if not agents.is_ambiguous_site(project):
+        text = agents.synthesize_deterministic_thot(project)
+        return {"status": "complete", "confidence": 0.98, "mode": "deterministic_zero_energy", "output": text.strip()}
+
     site = project.get("site", {})
     prompt = (
-        f"Project: {project['name']}\nLocation: {project['location']}\n"
-        f"Brief: {project['description']}\nTarget population: {project.get('population') or 'unspecified'}\n"
-        f"Parcel area: {site.get('area_m2', 0)} m2, validation status: {site.get('status')}.\n"
-        "Write a concise 120-word site & demographic context summary for a modular housing feasibility study. "
-        "Be factual and professional; do not invent regulations or prices."
+        f"Site: {project['name']}, {project['location']}. Area: {site.get('area_m2', 0)}m2. "
+        f"Brief: {project['description']}. Target: {project.get('population') or 'general'}. "
+        "Return strictly 2 concise bullet points: • Zoning & Climate: ... \n• Feasibility: ... (Max 50 words total)."
     )
+    sem_meta = {
+        "agent_type": "thot",
+        "city": project.get("location", ""),
+        "intent": project.get("description", "") + " " + (project.get("population") or "")
+    }
     text = await agents.llm_generate(
-        "You are THOT, the site-context agent of an urban planning platform. You summarise parcel and demographic context.",
-        prompt, f"thot-{project['id']}")
-    return {"status": "complete", "confidence": 0.92, "output": text.strip()}
+        "THOT agent. Output strictly 2 concise bullet points. No conversational filler.",
+        prompt, f"thot-{project['id']}", max_output_tokens=60, semantic_metadata=sem_meta)
+    return {"status": "complete", "confidence": 0.92, "mode": "gemini_ambiguity_escalation", "output": text.strip()}
 
 
 def run_kael(project):
     site = project.get("site", {})
+    poly = site.get("polygon")
+    seismic_info = None
+    if poly and isinstance(poly, list) and len(poly) >= 3:
+        spatial_res = spatial_index.SPATIAL_ENGINE.evaluate_parcel(poly, city_hint=project.get("location"))
+        seismic_info = spatial_res.get("seismic_zone")
+        if spatial_res.get("status") == "veto" and site.get("status") != "veto":
+            site["status"] = "veto"
+            site["veto_reason"] = spatial_res.get("veto_reason")
+
     if site.get("status") == "veto":
         cite = [r for r in REGULATIONS if r["code"] == "Municipal Bylaw MB-22.7"]
         return {"status": "complete", "confidence": 1.0, "veto": True,
-                "output": "Construction blocked by flood/ecological prohibition.", "citations": cite}
+                "output": site.get("veto_reason") or "Construction blocked by flood/ecological prohibition.", "citations": cite}
     if site.get("status") != "approved":
         return {"status": "gap", "gap": {"institution": "GIS / Cadastral Authority",
                 "reason": "Parcel must pass Site Validation before regulatory codes can be resolved.",
                 "missing_materials": []}}
     mats = chosen_materials(project)
     cites = [r for r in REGULATIONS if "materials" not in r or any(m in r["materials"] for m in mats)]
+    out_msg = f"{len(cites)} applicable codes resolved for the selected parcel and material palette."
+    if seismic_info:
+        out_msg += f" Site mapped to IS 1893:2016 {seismic_info.get('zone')} (Z={seismic_info.get('zone_factor_z')})."
     return {"status": "complete", "confidence": 0.97, "citations": cites,
-            "output": f"{len(cites)} applicable codes resolved for the selected parcel and material palette."}
+            "output": out_msg, "seismic_zone": seismic_info}
 
 
 async def run_iris(project):
@@ -252,15 +273,26 @@ async def run_iris(project):
         if mod:
             counts[mod["name"]] = counts.get(mod["name"], 0) + 1
     summary = ", ".join(f"{v}x {k}" for k, v in counts.items())
+
+    # Hybrid Agent Fallback: standard modular topologies use pre-formulated templates (<0.02ms, 0 Joules)
+    if not agents.is_novel_spatial_geometry(modules):
+        text = agents.synthesize_deterministic_iris(counts, summary)
+        return {"status": "complete", "confidence": 0.95, "mode": "deterministic_modular_template", "output": text.strip()}
+
     prompt = (
-        f"Modules selected: {summary}.\n"
-        "Propose exactly 3 distinct modular layout options (stacking/clustering) to maximise natural ventilation and daylight. "
-        "For each option give a short bold title and 2 sentences. Return as a numbered list. No prices, no regulations."
+        f"Modules: {summary}. "
+        "Propose strictly 3 numbered layout bullet points: 1. Name: 1 sentence. 2. Name: 1 sentence. 3. Name: 1 sentence. Max 55 words."
     )
+    sem_meta = {
+        "agent_type": "iris",
+        "city": project.get("location", ""),
+        "modules": summary,
+        "intent": "modular_layout_ventilation_daylight"
+    }
     text = await agents.llm_generate(
-        "You are IRIS, the generative design agent. You propose modular housing layout options.",
-        prompt, f"iris-{project['id']}")
-    return {"status": "complete", "confidence": 0.9, "output": text.strip()}
+        "IRIS generative agent. Output strictly 3 numbered concise layout bullets. Max 60 tokens.",
+        prompt, f"iris-{project['id']}", max_output_tokens=60, semantic_metadata=sem_meta)
+    return {"status": "complete", "confidence": 0.9, "mode": "gemini_ambiguity_escalation", "output": text.strip()}
 
 
 def run_cronos(project):
@@ -295,16 +327,27 @@ async def run_lyra(project, agent_outputs):
                 "reason": f"Cannot compile dossier — upstream agents incomplete: {', '.join(x.upper() for x in missing)}.",
                 "missing_materials": []}}
     totals = project.get("design", {}).get("totals", {})
+
+    # Hybrid Agent Fallback: standard statutory dossiers use deterministic synthesis (<0.02ms, 0 Joules)
+    if not agents.is_novel_dossier_variance(project, totals):
+        text = agents.synthesize_deterministic_lyra(project, totals)
+        return {"status": "complete", "confidence": 0.99, "mode": "deterministic_statutory_dossier", "output": text.strip()}
+
     prompt = (
-        f"Project {project['name']} in {project['location']}. Site approved. "
-        f"CapEx ₹ {totals.get('total_cost', 0):,.0f}, embodied carbon {totals.get('total_carbon', 0):,.0f} kg CO2e "
-        f"({totals.get('carbon_saving_pct', 0)}% below concrete benchmark). "
-        "Write a 100-word executive summary for a municipal submission dossier. Professional, confident, factual."
+        f"Project: {project['name']}, {project['location']}. CapEx: INR {totals.get('total_cost', 0):,.0f}, "
+        f"Carbon: {totals.get('total_carbon', 0):,.0f} kg CO2e (-{totals.get('carbon_saving_pct', 0)}% vs concrete). "
+        "Return strictly 2 bullet points: • Scheme: ... \n• Statutory Impact: ... (Max 45 words total)."
     )
+    sem_meta = {
+        "agent_type": "lyra",
+        "city": project.get("location", ""),
+        "modules": [m.get("module_id") for m in project.get("design", {}).get("modules", [])],
+        "intent": f"carbon_saving_{totals.get('carbon_saving_pct', 0)}"
+    }
     text = await agents.llm_generate(
-        "You are LYRA, the documentation agent compiling a municipal submission dossier.",
-        prompt, f"lyra-{project['id']}")
-    return {"status": "complete", "confidence": 0.96, "output": text.strip()}
+        "LYRA documentation agent. Output strictly 2 concise bullet points for municipal submission.",
+        prompt, f"lyra-{project['id']}", max_output_tokens=60, semantic_metadata=sem_meta)
+    return {"status": "complete", "confidence": 0.96, "mode": "gemini_ambiguity_escalation", "output": text.strip()}
 
 
 @api_router.post("/projects/{project_id}/agents/{agent_id}")
@@ -336,6 +379,51 @@ async def run_agent(project_id: str, agent_id: str, user=Depends(current_user)):
 async def root():
     return {"message": "UrbanisAI API"}
 
+@api_router.get("/telemetry/tokens")
+async def get_token_telemetry_endpoint():
+    return agents.get_token_telemetry()
+
+
+# ----------------------- Spatial & GIS Endpoints -----------------------
+class SpatialValidateInput(BaseModel):
+    polygon: List[List[float]]
+    city: Optional[str] = None
+    custom_features: Optional[List[Dict[str, Any]]] = None
+
+
+class SpatialBenchmarkInput(BaseModel):
+    polygon: List[List[float]]
+    iterations: Optional[int] = 200
+
+
+@api_router.post("/spatial/validate")
+async def spatial_validate(payload: SpatialValidateInput):
+    if payload.custom_features:
+        spatial_index.SPATIAL_ENGINE.register_custom_geojson(payload.custom_features)
+    res = spatial_index.SPATIAL_ENGINE.evaluate_parcel(payload.polygon, city_hint=payload.city)
+    return res
+
+
+@api_router.post("/spatial/benchmark")
+async def spatial_benchmark(payload: SpatialBenchmarkInput):
+    return spatial_index.SPATIAL_ENGINE.benchmark_spatial_query(payload.polygon, iterations=payload.iterations or 200)
+
+
+@api_router.get("/spatial/telemetry")
+async def get_spatial_telemetry_endpoint():
+    return spatial_index.get_spatial_telemetry()
+
+
+@api_router.get("/telemetry/metrics")
+async def get_telemetry_metrics():
+    import json
+    report_file = ROOT_DIR.parent / "telemetry_report.json"
+    if report_file.exists():
+        with open(report_file, "r", encoding="utf-8") as rf:
+            return json.load(rf)
+    return {"error": "Telemetry report not found"}
+
+
 
 app.include_router(api_router)
 
@@ -353,7 +441,8 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.projects.create_index("user_id")
     await auth.seed_admin(db)
-    logger.info("UrbanisAI backend ready")
+    await agents.init_semantic_cache(db)
+    logger.info("UrbanisAI backend ready with Multi-Tiered Semantic Caching")
 
 
 @app.on_event("shutdown")
