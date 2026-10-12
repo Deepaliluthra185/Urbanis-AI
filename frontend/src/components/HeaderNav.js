@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Boxes, LogOut, LayoutDashboard, Store } from "lucide-react";
+import { Boxes, LogOut, LayoutDashboard, Store, Zap } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "./ui/dropdown-menu";
@@ -28,11 +28,26 @@ export default function HeaderNav({ projectId, activeStep }) {
         </button>
 
         {projectId && activeStep ? (
-          <StepIndicator projectId={projectId} activeStep={activeStep} />
+          <div className="flex items-center gap-4">
+            <StepIndicator projectId={projectId} activeStep={activeStep} />
+            <button
+              onClick={() => navigate(`/project/${projectId}/energy`)}
+              className={`hidden xl:flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono border transition-colors ${
+                activeStep === "energy"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                  : "bg-transparent text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-zinc-200"
+              }`}
+              title="Green AI & Telemetry Audit"
+            >
+              <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Energy</span>
+            </button>
+          </div>
         ) : (
           <nav className="hidden md:flex items-center gap-1">
             <NavLink icon={LayoutDashboard} label="Dashboard" active={location.pathname === "/"} onClick={() => navigate("/")} testid="nav-dashboard" />
             <NavLink icon={Store} label="Sourcing" active={location.pathname === "/sourcing"} onClick={() => navigate("/sourcing")} testid="nav-sourcing" />
+            <NavLink icon={Zap} label="Energy & Telemetry" active={location.pathname === "/energy"} onClick={() => navigate("/energy")} testid="nav-energy" />
           </nav>
         )}
 
@@ -58,6 +73,9 @@ export default function HeaderNav({ projectId, activeStep }) {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/sourcing")} className="cursor-pointer" data-testid="menu-sourcing">
               <Store className="w-4 h-4 mr-2" /> Sourcing Directory
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(projectId ? `/project/${projectId}/energy` : "/energy")} className="cursor-pointer text-emerald-400 focus:text-emerald-400" data-testid="menu-energy">
+              <Zap className="w-4 h-4 mr-2 text-emerald-400" /> Energy & Telemetry
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-zinc-800" />
             <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-400 focus:text-red-400" data-testid="menu-logout">

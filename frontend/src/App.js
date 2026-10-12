@@ -11,6 +11,7 @@ import DesignCostingPage from "./pages/DesignCostingPage";
 import AiFormulationPage from "./pages/AiFormulationPage";
 import ProjectSummaryPage from "./pages/ProjectSummaryPage";
 import LocalSourcingPage from "./pages/LocalSourcingPage";
+import EnergyPage from "./pages/EnergyPage";
 
 console.log("[App.js Diagnostics]", {
   AuthProvider: typeof AuthProvider,
@@ -27,6 +28,7 @@ console.log("[App.js Diagnostics]", {
   AiFormulationPage: typeof AiFormulationPage,
   ProjectSummaryPage: typeof ProjectSummaryPage,
   LocalSourcingPage: typeof LocalSourcingPage,
+  EnergyPage: typeof EnergyPage,
   Toaster: typeof Toaster,
 });
 
@@ -40,10 +42,12 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/sourcing" element={<ProtectedRoute><LocalSourcingPage /></ProtectedRoute>} />
+              <Route path="/energy" element={<ProtectedRoute><EnergyPage /></ProtectedRoute>} />
               <Route path="/project/:id/site" element={<ProtectedRoute><SiteValidationPage /></ProtectedRoute>} />
               <Route path="/project/:id/design" element={<ProtectedRoute><DesignCostingPage /></ProtectedRoute>} />
               <Route path="/project/:id/formulation" element={<ProtectedRoute><AiFormulationPage /></ProtectedRoute>} />
               <Route path="/project/:id/summary" element={<ProtectedRoute><ProjectSummaryPage /></ProtectedRoute>} />
+              <Route path="/project/:id/energy" element={<ProtectedRoute><EnergyPage /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
