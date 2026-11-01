@@ -57,14 +57,64 @@
     color: hsl(240 5% 55%);
 }
 
-/* Leaflet dark tuning */
+/* Leaflet dark tuning & performance */
 .leaflet-container {
-    background: #0a0a0c;
+    background: #09090b;
     font-family: 'JetBrains Mono', monospace;
+    outline: none;
 }
-.leaflet-tile { filter: grayscale(0.6) brightness(0.75) contrast(1.05); }
-.leaflet-bar a { background: #18181b; color: #fafafa; border-color: #27272a; }
-.leaflet-bar a:hover { background: #27272a; }
+.leaflet-container:focus {
+    outline: none;
+}
+/* Smooth tile transitions without GPU-heavy CSS filter */
+.leaflet-tile {
+    image-rendering: auto;
+}
+.leaflet-bar {
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 6px !important;
+    overflow: hidden;
+}
+.leaflet-bar a {
+    background: #121215 !important;
+    color: #e4e4e7 !important;
+    border-bottom: 1px solid #27272a !important;
+    width: 30px !important;
+    height: 30px !important;
+    line-height: 30px !important;
+    font-size: 14px !important;
+    transition: all 0.15s ease;
+}
+.leaflet-bar a:hover {
+    background: #27272a !important;
+    color: #ffffff !important;
+}
+.leaflet-control-attribution {
+    background: rgba(9, 9, 11, 0.75) !important;
+    color: #71717a !important;
+    backdrop-filter: blur(4px);
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px;
+}
+.leaflet-control-attribution a {
+    color: #a1a1aa !important;
+}
+.leaflet-tooltip {
+    background: rgba(18, 18, 21, 0.92) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #f4f4f5 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    border-radius: 4px !important;
+    padding: 4px 8px !important;
+}
+.leaflet-tooltip-top:before { border-top-color: rgba(18, 18, 21, 0.92) !important; }
+.leaflet-tooltip-bottom:before { border-bottom-color: rgba(18, 18, 21, 0.92) !important; }
+.leaflet-tooltip-left:before { border-left-color: rgba(18, 18, 21, 0.92) !important; }
+.leaflet-tooltip-right:before { border-right-color: rgba(18, 18, 21, 0.92) !important; }
 .leaflet-draw-toolbar a { background-color: #18181b !important; }
 
 @keyframes beacon {

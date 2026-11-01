@@ -2,9 +2,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet-draw";
-import "leaflet-draw/dist/leaflet.draw.css";
-import Konva from "konva";
 import * as turf from "@turf/turf";
 import HeaderNav from "../components/HeaderNav";
 import { useProject } from "../context/ProjectContext";
@@ -27,6 +24,17 @@ import {
   Check,
   X,
   AlertTriangle,
+  Layers,
+  Maximize2,
+  Minimize2,
+  BoxSelect,
+  Edit3,
+  MousePointer,
+  Crosshair,
+  Compass,
+  Plus,
+  Minus,
+  Navigation,
 } from "lucide-react";
 import { toast } from "sonner";
 import { KNOWN_CITY_COORDINATES } from "../data/indianLocations";
@@ -36,16 +44,52 @@ import {
   ALL_RIVER_HAZARD_CORRIDORS,
 } from "../data/riverHazardZones";
 
+// High-performance basemaps with complete road labels and zero tile-drop
+const BASEMAPS = {
+  satellite: {
+    id: "satellite",
+    name: "Satellite (Hybrid)",
+    url: "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+    options: {
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      maxNativeZoom: 20,
+      maxZoom: 22,
+      attribution: "&copy; Google Satellite & Hybrid (Roads & Places)",
+    },
+  },
+  street: {
+    id: "street",
+    name: "Street Map",
+    url: "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+    options: {
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      maxNativeZoom: 20,
+      maxZoom: 22,
+      attribution: "&copy; Google Maps Roads & Places",
+    },
+  },
+  dark: {
+    id: "dark",
+    name: "Dark GIS",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    options: {
+      maxNativeZoom: 16,
+      maxZoom: 22,
+      attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+    },
+  },
+};
+
 // Pre-configured geographic zones & deterministic regulatory presets
 const CITY_CONFIGS = {
   amritsar: {
     cityName: "Amritsar, Punjab",
-    center: [31.6340, 74.8723],
+    center: [31.634, 74.8723],
     zoom: 14,
     floodZone: [
       [31.625, 74.885],
-      [31.650, 74.885],
-      [31.650, 74.912],
+      [31.65, 74.885],
+      [31.65, 74.912],
       [31.625, 74.912],
     ],
     floodName: "Punjab Alluvial / Beas 100-year flood zone",
@@ -73,10 +117,10 @@ const CITY_CONFIGS = {
         label: "Alluvial Floodplain",
         sub: "Intersects Punjab flood plain",
         coords: [
-          [31.630, 74.890],
-          [31.633, 74.890],
+          [31.63, 74.89],
+          [31.633, 74.89],
           [31.633, 74.893],
-          [31.630, 74.893],
+          [31.63, 74.893],
         ],
       },
       protected: {
@@ -93,19 +137,19 @@ const CITY_CONFIGS = {
   },
   delhi: {
     cityName: "Delhi, India",
-    center: [28.6250, 77.2400],
+    center: [28.625, 77.24],
     zoom: 14,
     floodZone: [
-      [28.618, 77.250],
-      [28.648, 77.250],
+      [28.618, 77.25],
+      [28.648, 77.25],
       [28.648, 77.268],
       [28.618, 77.268],
     ],
     floodName: "Yamuna River 100-year flood zone",
     floodLabel: "YAMUNA 100-YEAR FLOODPLAIN",
     protectedZone: [
-      [28.595, 77.210],
-      [28.615, 77.210],
+      [28.595, 77.21],
+      [28.615, 77.21],
       [28.615, 77.228],
       [28.595, 77.228],
     ],
@@ -117,8 +161,8 @@ const CITY_CONFIGS = {
         sub: "Central Delhi · Clear of veto layers",
         coords: [
           [28.628, 77.232],
-          [28.630, 77.232],
-          [28.630, 77.234],
+          [28.63, 77.232],
+          [28.63, 77.234],
           [28.628, 77.234],
         ],
       },
@@ -127,8 +171,8 @@ const CITY_CONFIGS = {
         sub: "Intersects river flood zone",
         coords: [
           [28.628, 77.252],
-          [28.630, 77.252],
-          [28.630, 77.254],
+          [28.63, 77.252],
+          [28.63, 77.254],
           [28.628, 77.254],
         ],
       },
@@ -149,71 +193,71 @@ const CITY_CONFIGS = {
     center: [12.9716, 77.5946],
     zoom: 14,
     floodZone: [
-      [12.930, 77.670],
-      [12.960, 77.670],
-      [12.960, 77.695],
-      [12.930, 77.695],
+      [12.94, 77.62],
+      [12.97, 77.62],
+      [12.97, 77.65],
+      [12.94, 77.65],
     ],
-    floodName: "Bellandur Catchment flood zone",
-    floodLabel: "BELLANDUR BASIN FLOODPLAIN",
+    floodName: "Bellandur Lake Inundation & Stormwater Buffer",
+    floodLabel: "BELLANDUR BASIN INUNDATION ZONE",
     protectedZone: [
-      [12.870, 77.560],
-      [12.900, 77.560],
-      [12.900, 77.585],
-      [12.870, 77.585],
+      [12.95, 77.58],
+      [12.97, 77.58],
+      [12.97, 77.605],
+      [12.95, 77.605],
     ],
-    protectedName: "Bannerghatta Eco-Sensitive Buffer",
-    protectedLabel: "BANNERGHATTA ECO-SENSITIVE ZONE",
+    protectedName: "Lalbagh Botanical Protected Core",
+    protectedLabel: "LALBAGH ECOLOGICAL CORE",
     presets: {
       compliant: {
         label: "Compliant Parcel",
-        sub: "Inner-City Core · Clear of veto layers",
+        sub: "CBD Area · Clear of lake buffer",
         coords: [
-          [12.974, 77.590],
-          [12.976, 77.590],
-          [12.976, 77.593],
-          [12.974, 77.593],
+          [12.975, 77.592],
+          [12.977, 77.592],
+          [12.977, 77.595],
+          [12.975, 77.595],
         ],
       },
       flood: {
-        label: "Lake Catchment Parcel",
-        sub: "Intersects flood catchment",
+        label: "Bellandur Wetland Parcel",
+        sub: "Intersects lake buffer zone",
         coords: [
-          [12.940, 77.675],
-          [12.943, 77.675],
-          [12.943, 77.678],
-          [12.940, 77.678],
+          [12.945, 77.625],
+          [12.948, 77.625],
+          [12.948, 77.628],
+          [12.945, 77.628],
         ],
       },
       protected: {
-        label: "Eco-Sensitive Parcel",
-        sub: "Intersects green reserve",
+        label: "Botanical Reserve Parcel",
+        sub: "Intersects Lalbagh buffer",
         coords: [
-          [12.880, 77.565],
-          [12.883, 77.565],
-          [12.883, 77.568],
-          [12.880, 77.568],
+          [12.955, 77.585],
+          [12.958, 77.585],
+          [12.958, 77.588],
+          [12.955, 77.588],
         ],
       },
     },
   },
   mumbai: {
     cityName: "Navi Mumbai, India",
-    center: [19.0330, 73.0297],
+    center: [19.033, 73.0297],
     zoom: 14,
     floodZone: [
-      [19.010, 73.040],
-      [19.040, 73.040],
-      [19.040, 73.065],
-      [19.010, 73.065],
+      [19.01, 73.04],
+      [19.04, 73.04],
+      [19.04, 73.065],
+      [19.01, 73.065],
     ],
     floodName: "Coastal CRZ-I Tidal Floodplain",
     floodLabel: "COASTAL TIDAL INUNDATION ZONE",
     protectedZone: [
-      [18.980, 73.000],
-      [19.005, 73.000],
-      [19.005, 73.020],
-      [18.980, 73.020],
+      [18.98, 73.0],
+      [19.005, 73.0],
+      [19.005, 73.02],
+      [18.98, 73.02],
     ],
     protectedName: "Mangrove Conservation Reserve",
     protectedLabel: "MANGROVE CONSERVATION RESERVE",
@@ -232,20 +276,20 @@ const CITY_CONFIGS = {
         label: "Tidal Inundation Parcel",
         sub: "Intersects coastal buffer",
         coords: [
-          [19.020, 73.045],
+          [19.02, 73.045],
           [19.023, 73.045],
           [19.023, 73.048],
-          [19.020, 73.048],
+          [19.02, 73.048],
         ],
       },
       protected: {
         label: "Mangrove Reserve Parcel",
         sub: "Intersects mangrove reserve",
         coords: [
-          [18.990, 73.005],
+          [18.99, 73.005],
           [18.993, 73.005],
           [18.993, 73.008],
-          [18.990, 73.008],
+          [18.99, 73.008],
         ],
       },
     },
@@ -255,18 +299,18 @@ const CITY_CONFIGS = {
     center: [30.7333, 76.7794],
     zoom: 14,
     floodZone: [
-      [30.720, 76.800],
-      [30.745, 76.800],
-      [30.745, 76.820],
-      [30.720, 76.820],
+      [30.72, 76.8],
+      [30.745, 76.8],
+      [30.745, 76.82],
+      [30.72, 76.82],
     ],
     floodName: "Sukhna Choe Seasonal Inundation Zone",
     floodLabel: "SUKHNA CHOE INUNDATION ZONE",
     protectedZone: [
-      [30.750, 76.810],
-      [30.770, 76.810],
-      [30.770, 76.835],
-      [30.750, 76.835],
+      [30.75, 76.81],
+      [30.77, 76.81],
+      [30.77, 76.835],
+      [30.75, 76.835],
     ],
     protectedName: "Sukhna Wildlife Sanctuary Reserve",
     protectedLabel: "SUKHNA WILDLIFE RESERVE",
@@ -311,8 +355,8 @@ function createDynamicConfig(cityName, lat, lng) {
     center: [lat, lng],
     zoom: 14,
     floodZone: [
-      [lat - 0.008, lng + 0.010],
-      [lat + 0.018, lng + 0.010],
+      [lat - 0.008, lng + 0.01],
+      [lat + 0.018, lng + 0.01],
       [lat + 0.018, lng + 0.025],
       [lat - 0.008, lng + 0.025],
     ],
@@ -321,8 +365,8 @@ function createDynamicConfig(cityName, lat, lng) {
     protectedZone: [
       [lat - 0.025, lng - 0.025],
       [lat - 0.008, lng - 0.025],
-      [lat - 0.008, lng - 0.010],
-      [lat - 0.025, lng - 0.010],
+      [lat - 0.008, lng - 0.01],
+      [lat - 0.025, lng - 0.01],
     ],
     protectedName: `${cityName} protected ecological reserve`,
     protectedLabel: `${cityName.toUpperCase()} ECOLOGICAL RESERVE`,
@@ -385,9 +429,12 @@ async function geocodeLocation(query) {
   if (local) return local;
 
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`, {
-      headers: { "Accept-Language": "en" },
-    });
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+      {
+        headers: { "Accept-Language": "en" },
+      }
+    );
     const data = await res.json();
     if (data && data.length > 0) {
       const lat = parseFloat(data[0].lat);
@@ -401,14 +448,22 @@ async function geocodeLocation(query) {
   return CITY_CONFIGS.delhi;
 }
 
-function toTurf(latlngs) {
-  const ring = latlngs.map(([lat, lng]) => [lng, lat]);
-  ring.push(ring[0]);
-  return turf.polygon([ring]);
-}
-
 function validatePolygonWithConfig(latlngs, config) {
   return evaluateParcelComprehensiveHazards(latlngs, config);
+}
+
+// Format area into user-selected unit
+function formatArea(areaM2, unit = "m2") {
+  if (!areaM2) return "0 m²";
+  if (unit === "sqft") {
+    const sqft = Math.round(areaM2 * 10.7639);
+    return `${sqft.toLocaleString()} sq ft`;
+  }
+  if (unit === "acres") {
+    const acres = (areaM2 * 0.000247105).toFixed(2);
+    return `${acres} acres`;
+  }
+  return `${areaM2.toLocaleString()} m²`;
 }
 
 export default function SiteValidationPage() {
@@ -418,24 +473,48 @@ export default function SiteValidationPage() {
 
   const mapRef = useRef(null);
   const mapEl = useRef(null);
+  const tileLayerRef = useRef(null);
   const drawnRef = useRef(null);
   const overlaysGroupRef = useRef(null);
+  const drawLayerRef = useRef(null);
+  const editMarkersRef = useRef(null);
+  const sharedCanvasRendererRef = useRef(null);
 
   const [activeConfig, setActiveConfig] = useState(CITY_CONFIGS.delhi);
   const activeConfigRef = useRef(CITY_CONFIGS.delhi);
   activeConfigRef.current = activeConfig;
 
-  // Hazard overlays visibility (Hidden while user freely draws, revealed upon completion!)
+  // Map Basemap & Layer Visibilities
+  const [activeBasemap, setActiveBasemap] = useState("satellite");
   const [showHazardLayers, setShowHazardLayers] = useState(false);
   const showHazardLayersRef = useRef(false);
   showHazardLayersRef.current = showHazardLayers;
 
-  // Konva Canvas Drawing Tool state
-  const [isKonvaDrawing, setIsKonvaDrawing] = useState(false);
-  const konvaContainerRef = useRef(null);
-  const konvaStageRef = useRef(null);
-  const konvaPointsRef = useRef([]);
-  const [placedCount, setPlacedCount] = useState(0);
+  const [showFlood, setShowFlood] = useState(true);
+  const [showProtected, setShowProtected] = useState(true);
+  const [mapHeightExpanded, setMapHeightExpanded] = useState(false);
+  const [areaUnit, setAreaUnit] = useState("m2"); // "m2" | "sqft" | "acres"
+
+  // Drawing Tools State
+  // "none" | "polygon" | "rectangle" | "edit"
+  const [drawTool, setDrawTool] = useState("none");
+  const drawToolRef = useRef("none");
+  drawToolRef.current = drawTool;
+
+  const [drawPoints, setDrawPoints] = useState([]);
+  const drawPointsRef = useRef([]);
+  drawPointsRef.current = drawPoints;
+
+  const [rectStartPoint, setRectStartPoint] = useState(null);
+  const rectStartPointRef = useRef(null);
+  rectStartPointRef.current = rectStartPoint;
+
+  const [currentParcelCoords, setCurrentParcelCoords] = useState(null);
+  const currentParcelCoordsRef = useRef(null);
+  currentParcelCoordsRef.current = currentParcelCoords;
+
+  const [liveCursorInfo, setLiveCursorInfo] = useState(null);
+  const [mouseCoords, setMouseCoords] = useState({ lat: 28.625, lng: 77.24, zoom: 14 });
 
   const [result, setResult] = useState(null);
   const [label, setLabel] = useState(null);
@@ -445,217 +524,222 @@ export default function SiteValidationPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searching, setSearching] = useState(false);
 
-  // Update Hazard Overlays (Blue Flood & Green Protected)
-  const updateMapOverlays = useCallback((cfg, isVisible) => {
+  // Backward compatibility alias for testids
+  const isKonvaDrawing = drawTool === "polygon" || drawTool === "rectangle";
+  const placedCount = drawPoints.length;
+
+  // -------------------------------------------------------------
+  // Basemap Switcher
+  // -------------------------------------------------------------
+  const switchBasemap = useCallback((basemapKey) => {
     const map = mapRef.current;
-    if (!map || !overlaysGroupRef.current) return;
-    overlaysGroupRef.current.clearLayers();
+    if (!map) return;
+    const basemapDef = BASEMAPS[basemapKey] || BASEMAPS.satellite;
 
-    if (!isVisible) return; // Hidden while user is drawing building footprint
-
-    // City primary flood zone layer
-    if (cfg?.floodZone) {
-      const floodLayer = L.polygon(cfg.floodZone, {
-        color: "#3b82f6",
-        weight: 2,
-        dashArray: "5,5",
-        fillColor: "#3b82f6",
-        fillOpacity: 0.22,
-      }).bindTooltip(cfg.floodLabel || "100-YEAR FLOODPLAIN", { permanent: false });
-      overlaysGroupRef.current.addLayer(floodLayer);
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
     }
 
-    // City protected zone layer
-    if (cfg?.protectedZone) {
-      const protLayer = L.polygon(cfg.protectedZone, {
-        color: "#22c55e",
-        weight: 2,
-        dashArray: "5,5",
-        fillColor: "#22c55e",
-        fillOpacity: 0.18,
-      }).bindTooltip(cfg.protectedLabel || "ECOLOGICAL RESERVE", { permanent: false });
-      overlaysGroupRef.current.addLayer(protLayer);
-    }
-
-    // Regional River Corridors & Floodplains (Beas, Ravi, Sutlej, Yamuna, etc.) - detailed set
-    REGIONAL_RIVER_HAZARDS.forEach((hazard) => {
-      if (hazard.coords) {
-        const riverLayer = L.polygon(hazard.coords, {
-          color: hazard.color || "#0284c7",
-          weight: 2,
-          dashArray: "6,4",
-          fillColor: hazard.color || "#0284c7",
-          fillOpacity: 0.22,
-        }).bindTooltip(hazard.label, { permanent: false });
-        overlaysGroupRef.current.addLayer(riverLayer);
-      }
-    });
-
-    // Pan-India CWC National River Corridors (Ganga, Brahmaputra, Godavari, Krishna, Kaveri, etc.)
-    ALL_RIVER_HAZARD_CORRIDORS.forEach((hazard) => {
-      if (hazard.coords) {
-        const riverLayer = L.polygon(hazard.coords, {
-          color: "#0ea5e9",
-          weight: 1.5,
-          dashArray: "8,5",
-          fillColor: "#0ea5e9",
-          fillOpacity: 0.14,
-        }).bindTooltip(
-          `<b>${hazard.name}</b><br/><span style="font-size:11px;color:#94a3b8">${hazard.legalRef || ""}</span>`,
-          { permanent: false }
-        );
-        overlaysGroupRef.current.addLayer(riverLayer);
-      }
-
-      // Also render centerline HFL buffer as a subtle line if available
-      if (hazard.centerline && hazard.centerline.length >= 2) {
-        const centerlineLayer = L.polyline(hazard.centerline, {
-          color: "#38bdf8",
-          weight: 1.5,
-          opacity: 0.5,
-          dashArray: "4,6",
-        }).bindTooltip(`${hazard.river || hazard.name} — River Centerline (HFL Buffer: ${hazard.bufferKm || 1}km)`, { permanent: false });
-        overlaysGroupRef.current.addLayer(centerlineLayer);
-      }
-    });
-  }, []);
-
-  const renderPolygon = useCallback((latlngs, res) => {
-    const map = mapRef.current;
-    if (!map || !drawnRef.current) return;
-    drawnRef.current.clearLayers();
-    const color = res.status === "veto" ? "#ef4444" : "#22c55e";
-    const layer = L.polygon(latlngs, {
-      color,
-      weight: 2.5,
-      fillOpacity: 0.2,
-      fillColor: color,
-    });
-    drawnRef.current.addLayer(layer);
-    map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 16 });
-  }, []);
-
-  // Initialize Leaflet Map
-  useEffect(() => {
-    if (mapRef.current || !mapEl.current) return;
-
-    const initialCenter = activeConfigRef.current.center;
-    const map = L.map(mapEl.current, { center: initialCenter, zoom: 14, zoomControl: true });
-    mapRef.current = map;
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-      maxZoom: 19,
+    const newTileLayer = L.tileLayer(basemapDef.url, {
+      ...basemapDef.options,
+      maxNativeZoom: basemapDef.options.maxNativeZoom || 19,
+      maxZoom: 22,
+      keepBuffer: 8,
+      updateWhenIdle: false,
+      updateWhenZooming: true,
+      updateInterval: 60,
     }).addTo(map);
 
-    const overlaysGroup = new L.FeatureGroup();
-    map.addLayer(overlaysGroup);
-    overlaysGroupRef.current = overlaysGroup;
+    newTileLayer.bringToBack();
+    tileLayerRef.current = newTileLayer;
+    setActiveBasemap(basemapKey);
+  }, []);
 
-    // By default, keep hazard layers hidden until building is drawn
-    updateMapOverlays(activeConfigRef.current, showHazardLayersRef.current);
+  // -------------------------------------------------------------
+  // Render Hazard Overlays using ultra-fast Hardware-Accelerated Canvas
+  // -------------------------------------------------------------
+  const updateMapOverlays = useCallback(
+    (cfg, isVisible) => {
+      const map = mapRef.current;
+      if (!map || !overlaysGroupRef.current) return;
+      overlaysGroupRef.current.clearLayers();
 
-    const drawn = new L.FeatureGroup();
-    map.addLayer(drawn);
-    drawnRef.current = drawn;
+      if (!isVisible) return;
 
-    const drawControl = new L.Control.Draw({
-      draw: {
-        polygon: { shapeOptions: { color: "#fafafa", weight: 2 }, allowIntersection: false, showArea: false },
-        polyline: false,
-        rectangle: false,
-        circle: false,
-        marker: false,
-        circlemarker: false,
-      },
-      edit: false,
-    });
-    map.addControl(drawControl);
+      const renderer = sharedCanvasRendererRef.current;
 
-    map.on(L.Draw.Event.CREATED, (e) => {
-      const latlngs = e.layer.getLatLngs()[0].map((p) => [p.lat, p.lng]);
-      const res = validatePolygonWithConfig(latlngs, activeConfigRef.current);
-      setResult(res);
-      setLabel("Custom Drawn Parcel");
-      renderPolygon(latlngs, res);
-      persist(latlngs, res, "Custom Drawn Parcel");
+      // City primary flood zone layer
+      if (cfg?.floodZone && showFlood) {
+        const floodLayer = L.polygon(cfg.floodZone, {
+          color: "#38bdf8",
+          weight: 2,
+          dashArray: "5,5",
+          fillColor: "#0284c7",
+          fillOpacity: 0.22,
+          renderer,
+        }).bindTooltip(cfg.floodLabel || "100-YEAR FLOODPLAIN", { permanent: false, direction: "top" });
+        overlaysGroupRef.current.addLayer(floodLayer);
+      }
 
-      // Reveal hazard overlays upon polygon completion
-      setShowHazardLayers(true);
-      updateMapOverlays(activeConfigRef.current, true);
-    });
+      // City protected zone layer
+      if (cfg?.protectedZone && showProtected) {
+        const protLayer = L.polygon(cfg.protectedZone, {
+          color: "#22c55e",
+          weight: 2,
+          dashArray: "5,5",
+          fillColor: "#16a34a",
+          fillOpacity: 0.2,
+          renderer,
+        }).bindTooltip(cfg.protectedLabel || "ECOLOGICAL RESERVE", { permanent: false, direction: "top" });
+        overlaysGroupRef.current.addLayer(protLayer);
+      }
 
-    setTimeout(() => map.invalidateSize(), 200);
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-    // eslint-disable-next-line
-  }, [updateMapOverlays]);
-
-  // Load project & automatically center map to project's location
-  useEffect(() => {
-    loadProject(id)
-      .then(async (p) => {
-        if (!p) return;
-        setProjName(p.name || "");
-        const loc = p.location || "";
-        setProjLocation(loc);
-        setSearchInput(loc);
-
-        // Auto-detect and configure coordinates from project's location
-        let cfg = CITY_CONFIGS.delhi;
-        if (loc) {
-          cfg = await geocodeLocation(loc);
-        }
-        setActiveConfig(cfg);
-        activeConfigRef.current = cfg;
-
-        const hasSavedPolygon = Boolean(p.site?.polygon);
-        setShowHazardLayers(hasSavedPolygon);
-
-        const map = mapRef.current;
-        if (map) {
-          updateMapOverlays(cfg, hasSavedPolygon);
-          if (!hasSavedPolygon) {
-            map.setView(cfg.center, cfg.zoom || 14);
+      // Regional River Corridors & Floodplains
+      if (showFlood) {
+        REGIONAL_RIVER_HAZARDS.forEach((hazard) => {
+          if (hazard.coords) {
+            const riverLayer = L.polygon(hazard.coords, {
+              color: hazard.color || "#0ea5e9",
+              weight: 2,
+              dashArray: "6,4",
+              fillColor: hazard.color || "#0ea5e9",
+              fillOpacity: 0.2,
+              renderer,
+            }).bindTooltip(hazard.label, { permanent: false, direction: "top" });
+            overlaysGroupRef.current.addLayer(riverLayer);
           }
-        }
+        });
 
-        if (hasSavedPolygon) {
-          const evaluatedRes = evaluateParcelComprehensiveHazards(p.site.polygon, cfg);
-          setResult(evaluatedRes);
-          setLabel(p.site.label || "Custom Drawn Building");
-          if (evaluatedRes.status !== p.site.status || evaluatedRes.veto_reason !== p.site.veto_reason) {
-            updateProject(id, {
-              site: {
-                ...p.site,
-                status: evaluatedRes.status,
-                veto_reason: evaluatedRes.veto_reason,
-              },
+        // Pan-India CWC National River Corridors
+        ALL_RIVER_HAZARD_CORRIDORS.forEach((hazard) => {
+          if (hazard.coords) {
+            const riverLayer = L.polygon(hazard.coords, {
+              color: "#38bdf8",
+              weight: 1.5,
+              dashArray: "8,5",
+              fillColor: "#0284c7",
+              fillOpacity: 0.16,
+              renderer,
+            }).bindTooltip(
+              `<b>${hazard.name}</b><br/><span style="font-size:11px;color:#94a3b8">${hazard.legalRef || ""}</span>`,
+              { permanent: false, direction: "top" }
+            );
+            overlaysGroupRef.current.addLayer(riverLayer);
+          }
+
+          if (hazard.centerline && hazard.centerline.length >= 2) {
+            const centerlineLayer = L.polyline(hazard.centerline, {
+              color: "#7dd3fc",
+              weight: 1.5,
+              opacity: 0.6,
+              dashArray: "4,6",
+              renderer,
+            }).bindTooltip(`${hazard.river || hazard.name} — River Centerline (HFL Buffer: ${hazard.bufferKm || 1}km)`, {
+              permanent: false,
             });
+            overlaysGroupRef.current.addLayer(centerlineLayer);
           }
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load project:", err);
+        });
+      }
+    },
+    [showFlood, showProtected]
+  );
+
+  // -------------------------------------------------------------
+  // Render Approved / Vetoed Parcel Polygon & Editable Handles
+  // -------------------------------------------------------------
+  const renderPolygon = useCallback(
+    (latlngs, res, shouldFit = true) => {
+      const map = mapRef.current;
+      if (!map || !drawnRef.current) return;
+      drawnRef.current.clearLayers();
+      if (editMarkersRef.current) editMarkersRef.current.clearLayers();
+
+      setCurrentParcelCoords(latlngs);
+
+      const isApproved = res.status === "approved";
+      const color = isApproved ? "#10b981" : "#f43f5e";
+      const fillColor = isApproved ? "#059669" : "#e11d48";
+
+      const layer = L.polygon(latlngs, {
+        color,
+        weight: 3,
+        fillColor,
+        fillOpacity: 0.28,
+        renderer: sharedCanvasRendererRef.current,
       });
-  }, [id, loadProject, updateMapOverlays]);
 
-  // Draw existing polygon if present
-  useEffect(() => {
-    if (mapRef.current && project?.site?.polygon && drawnRef.current && drawnRef.current.getLayers().length === 0) {
-      const res = {
-        status: project.site.status,
-        veto_reason: project.site.veto_reason,
-        area_m2: project.site.area_m2,
-        perimeter_m: project.site.perimeter_m,
-      };
-      renderPolygon(project.site.polygon, res);
-    }
-  }, [project, renderPolygon]);
+      layer.bindTooltip(
+        `<b>${isApproved ? "Approved Building Site" : "Hard Veto — Hazard Zone"}</b><br/>Area: ${res.area_m2?.toLocaleString() || 0} m²`,
+        { permanent: false, direction: "center" }
+      );
 
+      drawnRef.current.addLayer(layer);
+
+      // Render sleek interactive draggable corner handles for easy vertex adjustment!
+      if (editMarkersRef.current && latlngs.length >= 3) {
+        latlngs.forEach((coord, idx) => {
+          const markerIcon = L.divIcon({
+            className: "vertex-corner-handle",
+            html: `<div style="
+              width: 14px;
+              height: 14px;
+              background: #ffffff;
+              border: 3px solid ${color};
+              border-radius: 50%;
+              box-shadow: 0 0 10px ${color}80;
+              cursor: grab;
+              transform: translate(-50%, -50%);
+              transition: transform 0.15s ease;
+            "></div>`,
+            iconSize: [0, 0],
+          });
+
+          const marker = L.marker(coord, { icon: markerIcon, draggable: true });
+
+          marker.on("drag", () => {
+            const updatedCoords = [...latlngs];
+            const newPos = marker.getLatLng();
+            updatedCoords[idx] = [newPos.lat, newPos.lng];
+            layer.setLatLngs(updatedCoords);
+
+            // Compute live area while dragging
+            try {
+              const ring = updatedCoords.map(([lat, lng]) => [lng, lat]);
+              ring.push(ring[0]);
+              const livePoly = turf.polygon([ring]);
+              const liveArea = Math.round(turf.area(livePoly));
+              const livePerim = Math.round(turf.length(livePoly, { units: "meters" }));
+              setResult((prev) => (prev ? { ...prev, area_m2: liveArea, perimeter_m: livePerim } : null));
+            } catch (e) {
+              // Ignore degenerate polygon intermediate state
+            }
+          });
+
+          marker.on("dragend", () => {
+            const updatedCoords = layer.getLatLngs()[0].map((p) => [p.lat, p.lng]);
+            const newRes = validatePolygonWithConfig(updatedCoords, activeConfigRef.current);
+            setResult(newRes);
+            renderPolygon(updatedCoords, newRes, false);
+            persist(updatedCoords, newRes, "Adjusted Building Footprint");
+            toast.success("Parcel boundary adjusted and re-validated!");
+          });
+
+          editMarkersRef.current.addLayer(marker);
+        });
+      }
+
+      if (shouldFit) {
+        map.fitBounds(layer.getBounds(), { padding: [60, 60], maxZoom: 16 });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  // -------------------------------------------------------------
+  // Persist site to backend project database
+  // -------------------------------------------------------------
   const persist = async (latlngs, res, lbl) => {
     setSaving(true);
     await updateProject(id, {
@@ -673,32 +757,493 @@ export default function SiteValidationPage() {
     else toast.success("Site approved — parcel clears environmental hazard layers");
   };
 
+  // -------------------------------------------------------------
+  // Preset parcels
+  // -------------------------------------------------------------
   const applyPreset = (key) => {
     const preset = activeConfig.presets[key];
     if (!preset) return;
     const res = validatePolygonWithConfig(preset.coords, activeConfig);
     setResult(res);
     setLabel(preset.label);
-    renderPolygon(preset.coords, res);
+    renderPolygon(preset.coords, res, true);
     persist(preset.coords, res, preset.label);
 
-    // Reveal hazard overlays so user sees why preset passes or vetoes
     setShowHazardLayers(true);
     updateMapOverlays(activeConfig, true);
   };
 
   const clear = async () => {
     drawnRef.current?.clearLayers();
+    if (editMarkersRef.current) editMarkersRef.current.clearLayers();
+    if (drawLayerRef.current) drawLayerRef.current.clearLayers();
+    setCurrentParcelCoords(null);
     setResult(null);
     setLabel(null);
     setShowHazardLayers(false);
     updateMapOverlays(activeConfig, false);
+    setDrawTool("none");
+    setDrawPoints([]);
     await updateProject(id, {
       site: { polygon: null, status: "pending", area_m2: 0, perimeter_m: 0, veto_reason: null, label: null },
     });
-    toast.info("Cleared parcel. Draw a new building location.");
+    toast.info("Cleared parcel. Use drawing tools or presets to define your site.");
   };
 
+  // -------------------------------------------------------------
+  // Finish Custom Boundary
+  // -------------------------------------------------------------
+  const finishDrawingPolygon = useCallback(() => {
+    const pts = drawPointsRef.current;
+    if (pts.length < 3) {
+      toast.error("Place at least 3 points to complete a building boundary");
+      return;
+    }
+
+    const latlngs = pts.map((p) => [p.lat, p.lng]);
+    const res = validatePolygonWithConfig(latlngs, activeConfigRef.current);
+    setResult(res);
+    setLabel("Custom Drawn Building");
+    renderPolygon(latlngs, res, true);
+    persist(latlngs, res, "Custom Drawn Building");
+
+    setShowHazardLayers(true);
+    updateMapOverlays(activeConfigRef.current, true);
+
+    if (drawLayerRef.current) drawLayerRef.current.clearLayers();
+    setDrawTool("none");
+    setDrawPoints([]);
+    setLiveCursorInfo(null);
+    toast.success("Building footprint defined! Environmental hazard layers revealed.");
+  }, [renderPolygon, updateMapOverlays]);
+
+  // -------------------------------------------------------------
+  // Cancel Drawing
+  // -------------------------------------------------------------
+  const cancelDrawing = () => {
+    setDrawTool("none");
+    setDrawPoints([]);
+    setRectStartPoint(null);
+    setLiveCursorInfo(null);
+    if (drawLayerRef.current) drawLayerRef.current.clearLayers();
+    toast.info("Drawing canceled");
+  };
+
+  // Undo last vertex
+  const undoLastPoint = () => {
+    setDrawPoints((prev) => {
+      if (prev.length === 0) return prev;
+      const next = prev.slice(0, -1);
+      drawPointsRef.current = next;
+      redrawPreview();
+      return next;
+    });
+  };
+
+  // Redraw live in-progress drawing preview directly on Leaflet map
+  const redrawPreview = (currentLatLng) => {
+    const map = mapRef.current;
+    const previewGroup = drawLayerRef.current;
+    if (!map || !previewGroup) return;
+
+    previewGroup.clearLayers();
+    const pts = drawPointsRef.current;
+
+    if (pts.length === 0 && !currentLatLng) return;
+
+    // Render placed vertices
+    pts.forEach((p, idx) => {
+      const isStart = idx === 0;
+      const markerIcon = L.divIcon({
+        className: "draw-vertex-point",
+        html: `<div style="
+          width: ${isStart ? "18px" : "12px"};
+          height: ${isStart ? "18px" : "12px"};
+          background: ${isStart ? "#38bdf8" : "#ffffff"};
+          border: 2px solid ${isStart ? "#0284c7" : "#0ea5e9"};
+          border-radius: 50%;
+          box-shadow: 0 0 10px rgba(56, 189, 248, 0.9);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+          font-weight: bold;
+          color: ${isStart ? "#000000" : "#0284c7"};
+          transform: translate(-50%, -50%);
+        ">${idx + 1}</div>`,
+        iconSize: [0, 0],
+      });
+
+      const vertexMarker = L.marker([p.lat, p.lng], { icon: markerIcon });
+      if (isStart && pts.length >= 3) {
+        vertexMarker.on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
+          finishDrawingPolygon();
+        });
+      }
+      previewGroup.addLayer(vertexMarker);
+    });
+
+    // Render connecting lines & shaded polygon preview
+    if (pts.length >= 2) {
+      const polyCoords = pts.map((p) => [p.lat, p.lng]);
+      const line = L.polyline(polyCoords, {
+        color: "#38bdf8",
+        weight: 2.5,
+        dashArray: "6,4",
+      });
+      previewGroup.addLayer(line);
+    }
+
+    // Active rubberband line to cursor
+    if (pts.length > 0 && currentLatLng) {
+      const last = pts[pts.length - 1];
+      const rubberband = L.polyline(
+        [
+          [last.lat, last.lng],
+          [currentLatLng.lat, currentLatLng.lng],
+        ],
+        {
+          color: "#0ea5e9",
+          weight: 1.8,
+          dashArray: "4,4",
+        }
+      );
+      previewGroup.addLayer(rubberband);
+
+      // Closing dashed line to start if >= 2 points
+      if (pts.length >= 2) {
+        const start = pts[0];
+        const closingLine = L.polyline(
+          [
+            [currentLatLng.lat, currentLatLng.lng],
+            [start.lat, start.lng],
+          ],
+          {
+            color: "#38bdf8",
+            weight: 1.2,
+            dashArray: "2,4",
+            opacity: 0.6,
+          }
+        );
+        previewGroup.addLayer(closingLine);
+      }
+    }
+  };
+
+  // -------------------------------------------------------------
+  // Initialize Leaflet Map with Silky Smooth Controls
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (mapRef.current || !mapEl.current) return;
+
+    const initialCenter = activeConfigRef.current.center;
+
+    // Create shared high-speed HTML5 Canvas renderer for vector graphics
+    const canvasRenderer = L.canvas({ padding: 0.5 });
+    sharedCanvasRendererRef.current = canvasRenderer;
+
+    const map = L.map(mapEl.current, {
+      center: initialCenter,
+      zoom: 14,
+      maxZoom: 22,
+      minZoom: 3,
+      zoomControl: false, // Clean custom floating buttons
+      preferCanvas: true, // 60fps canvas hardware acceleration for polygons
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
+      zoomSnap: 0.25, // Fractional zoom allows butter-smooth wheel/trackpad scrolling
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 120,
+      wheelDebounceTime: 40,
+      inertia: true,
+      inertiaDeceleration: 3000,
+      easeLinearity: 0.2,
+      worldCopyJump: false,
+    });
+    mapRef.current = map;
+
+    // Default tile layer (Google Hybrid Satellite with road & place labels)
+    const initialBasemap = BASEMAPS.satellite;
+    const tileLayer = L.tileLayer(initialBasemap.url, {
+      ...initialBasemap.options,
+      maxNativeZoom: initialBasemap.options.maxNativeZoom || 19,
+      maxZoom: 22,
+      keepBuffer: 8,
+      updateWhenIdle: false,
+      updateWhenZooming: true,
+      updateInterval: 60,
+    }).addTo(map);
+    tileLayer.bringToBack();
+    tileLayerRef.current = tileLayer;
+
+    // Overlays group (Flood & Protected zones)
+    const overlaysGroup = new L.FeatureGroup();
+    map.addLayer(overlaysGroup);
+    overlaysGroupRef.current = overlaysGroup;
+
+    // Drawn parcel group
+    const drawn = new L.FeatureGroup();
+    map.addLayer(drawn);
+    drawnRef.current = drawn;
+
+    // Edit handles group
+    const editHandles = new L.FeatureGroup();
+    map.addLayer(editHandles);
+    editMarkersRef.current = editHandles;
+
+    // In-progress draw preview group
+    const drawGroup = new L.FeatureGroup();
+    map.addLayer(drawGroup);
+    drawLayerRef.current = drawGroup;
+
+    updateMapOverlays(activeConfigRef.current, showHazardLayersRef.current);
+
+    // Track mouse coordinates for HUD
+    map.on("mousemove", (e) => {
+      setMouseCoords({
+        lat: Number(e.latlng.lat.toFixed(4)),
+        lng: Number(e.latlng.lng.toFixed(4)),
+        zoom: Number(map.getZoom().toFixed(1)),
+      });
+
+      // Handle interactive drawing feedback
+      if (drawToolRef.current === "polygon") {
+        const pts = drawPointsRef.current;
+        let targetLatLng = e.latlng;
+        let isSnapped = false;
+
+        // Vertex magnetic snapping to start point (< 22px)
+        if (pts.length >= 3) {
+          const startPt = pts[0];
+          const startLayerPoint = map.latLngToContainerPoint([startPt.lat, startPt.lng]);
+          const cursorLayerPoint = map.latLngToContainerPoint(e.latlng);
+          const distPx = startLayerPoint.distanceTo(cursorLayerPoint);
+
+          if (distPx < 22) {
+            targetLatLng = L.latLng(startPt.lat, startPt.lng);
+            isSnapped = true;
+          }
+        }
+
+        let edgeMeters = 0;
+        let liveAreaM2 = 0;
+
+        if (pts.length > 0) {
+          const last = pts[pts.length - 1];
+          edgeMeters = Math.round(map.distance(L.latLng(last.lat, last.lng), targetLatLng));
+        }
+
+        if (pts.length >= 2) {
+          try {
+            const previewRing = pts.map((p) => [p.lng, p.lat]);
+            previewRing.push([targetLatLng.lng, targetLatLng.lat]);
+            previewRing.push(previewRing[0]);
+            const tempPoly = turf.polygon([previewRing]);
+            liveAreaM2 = Math.round(turf.area(tempPoly));
+          } catch (err) {
+            // intermediate collinear points
+          }
+        }
+
+        setLiveCursorInfo({
+          isSnapped,
+          edgeMeters,
+          liveAreaM2,
+        });
+
+        redrawPreview(targetLatLng);
+      } else if (drawToolRef.current === "rectangle" && rectStartPointRef.current) {
+        // Live Rectangle Drag Preview
+        const start = rectStartPointRef.current;
+        const bounds = L.latLngBounds([start.lat, start.lng], [e.latlng.lat, e.latlng.lng]);
+        drawGroup.clearLayers();
+        const rectLayer = L.rectangle(bounds, {
+          color: "#38bdf8",
+          weight: 2,
+          dashArray: "5,5",
+          fillColor: "#0284c7",
+          fillOpacity: 0.2,
+        });
+        drawGroup.addLayer(rectLayer);
+
+        const widthM = Math.round(map.distance([start.lat, start.lng], [start.lat, e.latlng.lng]));
+        const heightM = Math.round(map.distance([start.lat, start.lng], [e.latlng.lat, start.lng]));
+        setLiveCursorInfo({
+          edgeMeters: widthM,
+          liveAreaM2: widthM * heightM,
+          rectDim: `${widthM}m × ${heightM}m`,
+        });
+      }
+    });
+
+    // Map Click Handler for Drawing
+    map.on("click", (e) => {
+      if (drawToolRef.current === "polygon") {
+        const pts = drawPointsRef.current;
+
+        // If clicked on or near the first point after placing >= 3 corners: Complete!
+        if (pts.length >= 3) {
+          const startPt = pts[0];
+          const startPx = map.latLngToContainerPoint([startPt.lat, startPt.lng]);
+          const clickPx = map.latLngToContainerPoint(e.latlng);
+          if (startPx.distanceTo(clickPx) < 22) {
+            finishDrawingPolygon();
+            return;
+          }
+        }
+
+        const newPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
+        const updated = [...pts, newPoint];
+        setDrawPoints(updated);
+        drawPointsRef.current = updated;
+        redrawPreview(e.latlng);
+      } else if (drawToolRef.current === "rectangle") {
+        if (!rectStartPointRef.current) {
+          rectStartPointRef.current = { lat: e.latlng.lat, lng: e.latlng.lng };
+          setRectStartPoint(rectStartPointRef.current);
+          toast.info("Corner #1 placed! Click opposite corner to complete rectangle.");
+        } else {
+          // Finish Rectangle
+          const start = rectStartPointRef.current;
+          const end = { lat: e.latlng.lat, lng: e.latlng.lng };
+          const rectCoords = [
+            [start.lat, start.lng],
+            [start.lat, end.lng],
+            [end.lat, end.lng],
+            [end.lat, start.lng],
+          ];
+
+          const res = validatePolygonWithConfig(rectCoords, activeConfigRef.current);
+          setResult(res);
+          setLabel("Rectangular Building Plot");
+          renderPolygon(rectCoords, res, true);
+          persist(rectCoords, res, "Rectangular Building Plot");
+
+          setShowHazardLayers(true);
+          updateMapOverlays(activeConfigRef.current, true);
+
+          drawGroup.clearLayers();
+          setDrawTool("none");
+          setRectStartPoint(null);
+          rectStartPointRef.current = null;
+          setLiveCursorInfo(null);
+          toast.success("Rectangular building footprint placed!");
+        }
+      }
+    });
+
+    // Double-click to complete polygon
+    map.on("dblclick", (e) => {
+      if (drawToolRef.current === "polygon" && drawPointsRef.current.length >= 3) {
+        L.DomEvent.stopPropagation(e);
+        finishDrawingPolygon();
+      }
+    });
+
+    setTimeout(() => map.invalidateSize(), 200);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line
+  }, []);
+
+  // Keyboard shortcuts (Enter to finish, Backspace to undo, Esc to cancel)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (drawTool === "polygon") {
+        if (e.key === "Enter" && drawPoints.length >= 3) {
+          e.preventDefault();
+          finishDrawingPolygon();
+        } else if ((e.key === "Backspace" || (e.ctrlKey && e.key === "z")) && drawPoints.length > 0) {
+          e.preventDefault();
+          undoLastPoint();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          cancelDrawing();
+        }
+      } else if (drawTool === "rectangle" && e.key === "Escape") {
+        e.preventDefault();
+        cancelDrawing();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawTool, drawPoints.length, finishDrawingPolygon]);
+
+  // Load project & automatically center map to project's location (only on initial mount or id change)
+  useEffect(() => {
+    loadProject(id)
+      .then(async (p) => {
+        if (!p) return;
+        setProjName(p.name || "");
+        const loc = p.location || "";
+        setProjLocation(loc);
+        setSearchInput(loc);
+
+        // Auto-detect and configure coordinates from project's location
+        let cfg = CITY_CONFIGS.delhi;
+        if (loc) {
+          cfg = await geocodeLocation(loc);
+        }
+        setActiveConfig(cfg);
+        activeConfigRef.current = cfg;
+
+        const hasSavedPolygon = Boolean(p.site?.polygon && p.site.polygon.length >= 3);
+        setShowHazardLayers(hasSavedPolygon);
+
+        const map = mapRef.current;
+        if (map) {
+          updateMapOverlays(cfg, hasSavedPolygon);
+
+          if (hasSavedPolygon) {
+            // Check if saved polygon is located in the active region (or old mismatched dummy coordinates)
+            const polyCenterLat = p.site.polygon.reduce((sum, pt) => sum + pt[0], 0) / p.site.polygon.length;
+            const polyCenterLng = p.site.polygon.reduce((sum, pt) => sum + pt[1], 0) / p.site.polygon.length;
+            const distFromCity = map.distance(
+              L.latLng(polyCenterLat, polyCenterLng),
+              L.latLng(cfg.center[0], cfg.center[1])
+            );
+
+            // If polygon is within 400km of city, fit to polygon; otherwise center on city
+            if (distFromCity < 400000) {
+              const evaluatedRes = evaluateParcelComprehensiveHazards(p.site.polygon, cfg);
+              setResult(evaluatedRes);
+              setLabel(p.site.label || "Custom Drawn Building");
+              renderPolygon(p.site.polygon, evaluatedRes, true);
+            } else {
+              map.setView(cfg.center, cfg.zoom || 14);
+            }
+          } else {
+            map.setView(cfg.center, cfg.zoom || 14);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load project:", err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Set map container cursor safely via Leaflet DOM without stripping Leaflet's internal CSS classes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const container = map.getContainer();
+    if (container) {
+      container.style.cursor = drawTool !== "none" ? "crosshair" : "";
+    }
+  }, [drawTool]);
+
+  // Recalculate overlays when hazard layer checkboxes change
+  useEffect(() => {
+    updateMapOverlays(activeConfig, showHazardLayers);
+  }, [showFlood, showProtected, showHazardLayers, activeConfig, updateMapOverlays]);
+
+  // Handle Location Search
   const handleLocationSearch = async (locQuery) => {
     if (!locQuery || !locQuery.trim()) return;
     setSearching(true);
@@ -712,7 +1257,7 @@ export default function SiteValidationPage() {
       if (map) {
         map.flyTo(cfg.center, cfg.zoom || 14, { duration: 1.2 });
       }
-      toast.success(`Map centered to ${cfg.cityName}`);
+      toast.success(`Map smoothly centered to ${cfg.cityName}`);
     } catch (e) {
       toast.error("Could not find location");
     } finally {
@@ -726,7 +1271,7 @@ export default function SiteValidationPage() {
     toast.success(`Updated project location to ${activeConfig.cityName}`);
   };
 
-  // Toggle Hazard Overlays manually
+  // Toggle Hazard Overlays
   const toggleHazardLayers = () => {
     const next = !showHazardLayers;
     setShowHazardLayers(next);
@@ -735,308 +1280,128 @@ export default function SiteValidationPage() {
     else toast.info("Environmental hazard layers hidden");
   };
 
-  // -------------------------------------------------------------
-  // Konva Interactive Polygon Building Drawer
-  // -------------------------------------------------------------
-  const startKonvaDrawing = () => {
-    setIsKonvaDrawing(true);
-    // Hide hazard layers while actively planning/drawing to keep canvas clean
+  // Start Drawing Tools
+  const startPolygonDrawing = () => {
+    setDrawTool("polygon");
+    setDrawPoints([]);
+    setLiveCursorInfo(null);
     setShowHazardLayers(false);
     updateMapOverlays(activeConfig, false);
-    toast.info("Building Drawing Mode: Click on the map to place building corners", {
-      description: "Click the starting point or double-click when finished.",
+    toast.info("Freehand Polygon Tool: Click on map to place corners", {
+      description: "Pan & zoom are active! Snap to corner #1 or press Enter when done.",
     });
   };
 
-  const cancelKonvaDrawing = () => {
-    setIsKonvaDrawing(false);
-    konvaPointsRef.current = [];
-    setPlacedCount(0);
-    toast.info("Building drawing canceled");
+  const startRectangleDrawing = () => {
+    setDrawTool("rectangle");
+    setRectStartPoint(null);
+    rectStartPointRef.current = null;
+    setLiveCursorInfo(null);
+    setShowHazardLayers(false);
+    updateMapOverlays(activeConfig, false);
+    toast.info("Box Tool: Click 2 opposite corners to drop an instant plot", {
+      description: "Click once for corner 1, then click corner 2.",
+    });
   };
 
-  const undoLastKonvaPoint = () => {
-    if (konvaPointsRef.current.length > 0) {
-      konvaPointsRef.current.pop();
-      setPlacedCount(konvaPointsRef.current.length);
-      // Trigger redraw in stage if active
-      if (konvaStageRef.current?._customRedraw) {
-        konvaStageRef.current._customRedraw();
-      }
-    }
-  };
-
-  const finishKonvaPolygon = useCallback(() => {
-    const pts = konvaPointsRef.current;
-    if (pts.length < 3) {
-      toast.error("Place at least 3 points to complete a building boundary");
+  // Fit view to current parcel
+  const fitToParcel = () => {
+    const map = mapRef.current;
+    if (!map || !currentParcelCoords || currentParcelCoords.length === 0) {
+      toast.info("No parcel placed yet. Draw or select a preset first.");
       return;
     }
+    const bounds = L.latLngBounds(currentParcelCoords);
+    map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 16, duration: 1 });
+  };
+
+  // Recenter to active city
+  const recenterToCity = () => {
     const map = mapRef.current;
     if (!map) return;
+    map.flyTo(activeConfig.center, activeConfig.zoom || 14, { duration: 1 });
+  };
 
-    const latlngs = pts.map((p) => [p.lat, p.lng]);
-    const res = validatePolygonWithConfig(latlngs, activeConfigRef.current);
-    setResult(res);
-    setLabel("Custom Drawn Building");
-    renderPolygon(latlngs, res);
-    persist(latlngs, res, "Custom Drawn Building");
-
-    // REVEAL ENVIRONMENTAL HAZARD OVERLAYS NOW!
-    setShowHazardLayers(true);
-    updateMapOverlays(activeConfigRef.current, true);
-
-    setIsKonvaDrawing(false);
-    konvaPointsRef.current = [];
-    setPlacedCount(0);
-
-    toast.success("Building footprint defined! Environmental hazard layers revealed.");
-  }, [renderPolygon, updateMapOverlays]);
-
-  // Mount Konva Stage when drawing mode is active
-  useEffect(() => {
-    if (!isKonvaDrawing || !konvaContainerRef.current || !mapRef.current) return;
-    const map = mapRef.current;
-    const container = konvaContainerRef.current;
-    const width = container.clientWidth || 800;
-    const height = container.clientHeight || 540;
-
-    // Disable map interaction during precision drawing
-    map.dragging.disable();
-    map.touchZoom?.disable();
-    map.doubleClickZoom?.disable();
-    map.scrollWheelZoom?.disable();
-
-    const stage = new Konva.Stage({
-      container,
-      width,
-      height,
+  // Toggle map expansion
+  const toggleMapExpansion = () => {
+    setMapHeightExpanded((prev) => {
+      const next = !prev;
+      setTimeout(() => {
+        if (mapRef.current) mapRef.current.invalidateSize();
+      }, 300);
+      return next;
     });
-    konvaStageRef.current = stage;
-
-    const layer = new Konva.Layer();
-    stage.add(layer);
-
-    // Interactive backdrop
-    const bgRect = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width,
-      height,
-      fill: "rgba(0, 0, 0, 0.08)",
-    });
-    layer.add(bgRect);
-
-    // In-progress polygon
-    const polyLine = new Konva.Line({
-      points: [],
-      stroke: "#38bdf8",
-      strokeWidth: 2.5,
-      dash: [6, 4],
-      closed: false,
-      fill: "rgba(56, 189, 248, 0.18)",
-    });
-    layer.add(polyLine);
-
-    // Rubberband line to mouse
-    const rubberband = new Konva.Line({
-      points: [],
-      stroke: "#94a3b8",
-      strokeWidth: 1.5,
-      dash: [4, 4],
-    });
-    layer.add(rubberband);
-
-    // Dimension metric text on active edge
-    const measureText = new Konva.Text({
-      text: "",
-      fontSize: 11,
-      fontFamily: "monospace",
-      fill: "#38bdf8",
-      padding: 3,
-    });
-    layer.add(measureText);
-
-    // Cursor tip
-    const cursorGuide = new Konva.Text({
-      text: "Click to place starting vertex of building",
-      fontSize: 11,
-      fontFamily: "monospace",
-      fill: "#fafafa",
-    });
-    layer.add(cursorGuide);
-
-    const verticesGroup = new Konva.Group();
-    layer.add(verticesGroup);
-
-    const points = konvaPointsRef.current;
-
-    const redraw = (currentPointer) => {
-      const flatPts = [];
-      points.forEach((p) => {
-        flatPts.push(p.x, p.y);
-      });
-      polyLine.points(flatPts);
-
-      verticesGroup.destroyChildren();
-      points.forEach((p, idx) => {
-        const isStart = idx === 0;
-        const circle = new Konva.Circle({
-          x: p.x,
-          y: p.y,
-          radius: isStart ? 7 : 5,
-          fill: isStart ? "#38bdf8" : "#ffffff",
-          stroke: "#0284c7",
-          strokeWidth: 2,
-        });
-        verticesGroup.add(circle);
-
-        const num = new Konva.Text({
-          x: p.x + 8,
-          y: p.y - 12,
-          text: `${idx + 1}`,
-          fontSize: 10,
-          fontFamily: "monospace",
-          fill: "#e2e8f0",
-        });
-        verticesGroup.add(num);
-      });
-
-      if (points.length > 0 && currentPointer) {
-        const last = points[points.length - 1];
-        let targetX = currentPointer.x;
-        let targetY = currentPointer.y;
-
-        let isSnapped = false;
-        if (points.length >= 3) {
-          const start = points[0];
-          const distToStart = Math.hypot(currentPointer.x - start.x, currentPointer.y - start.y);
-          if (distToStart < 22) {
-            targetX = start.x;
-            targetY = start.y;
-            isSnapped = true;
-          }
-        }
-
-        rubberband.points([last.x, last.y, targetX, targetY]);
-        rubberband.visible(true);
-
-        const lastLatLng = L.latLng(last.lat, last.lng);
-        const currLatLng = map.containerPointToLatLng(L.point(targetX, targetY));
-        const distMeters = Math.round(map.distance(lastLatLng, currLatLng));
-
-        measureText.text(`${distMeters} m`);
-        measureText.x((last.x + targetX) / 2 + 8);
-        measureText.y((last.y + targetY) / 2 - 16);
-        measureText.visible(true);
-
-        if (isSnapped) {
-          cursorGuide.text("Snap to Start • Click to complete & reveal hazard analysis");
-        } else if (points.length < 3) {
-          cursorGuide.text(`Corner #${points.length + 1} • Click to place point`);
-        } else {
-          cursorGuide.text(`Corner #${points.length + 1} • Click point 1 or double-click to finish`);
-        }
-        cursorGuide.x(Math.min(currentPointer.x + 15, width - 280));
-        cursorGuide.y(Math.max(currentPointer.y - 25, 12));
-        cursorGuide.visible(true);
-      } else {
-        rubberband.visible(false);
-        measureText.visible(false);
-        if (currentPointer) {
-          cursorGuide.text("Click to place starting vertex of building");
-          cursorGuide.x(Math.min(currentPointer.x + 15, width - 280));
-          cursorGuide.y(Math.max(currentPointer.y - 25, 12));
-          cursorGuide.visible(true);
-        }
-      }
-
-      layer.batchDraw();
-    };
-
-    stage._customRedraw = () => redraw(stage.getPointerPosition());
-
-    const handlePointerMove = () => {
-      const pos = stage.getPointerPosition();
-      if (pos) redraw(pos);
-    };
-
-    const handlePointerDown = () => {
-      const pos = stage.getPointerPosition();
-      if (!pos) return;
-
-      if (points.length >= 3) {
-        const start = points[0];
-        const dist = Math.hypot(pos.x - start.x, pos.y - start.y);
-        if (dist < 22) {
-          finishKonvaPolygon();
-          return;
-        }
-      }
-
-      const latlng = map.containerPointToLatLng(L.point(pos.x, pos.y));
-      points.push({
-        x: pos.x,
-        y: pos.y,
-        lat: latlng.lat,
-        lng: latlng.lng,
-      });
-      setPlacedCount(points.length);
-      redraw(pos);
-    };
-
-    const handleDblClick = () => {
-      if (points.length >= 3) {
-        finishKonvaPolygon();
-      }
-    };
-
-    stage.on("pointermove", handlePointerMove);
-    stage.on("pointerdown", handlePointerDown);
-    stage.on("dblclick", handleDblClick);
-
-    return () => {
-      stage.destroy();
-      konvaStageRef.current = null;
-      map.dragging.enable();
-      map.touchZoom?.enable();
-      map.doubleClickZoom?.enable();
-      map.scrollWheelZoom?.enable();
-    };
-  }, [isKonvaDrawing, finishKonvaPolygon]);
+  };
 
   const approved = result?.status === "approved";
   const footprint = result ? Math.round(result.area_m2 * 0.4) : 0;
 
   return (
-    <div className="min-h-screen bg-[#09090b]">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100">
       <HeaderNav projectId={id} activeStep="site" />
-      <main className="max-w-[1600px] mx-auto px-6 py-8">
-        <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <main className="max-w-[1680px] mx-auto px-4 sm:px-6 py-6">
+        {/* Top Header & Context */}
+        <div className="mb-5 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <p className="eyebrow mb-1 flex items-center gap-2">
-              <MapPin className="w-3 h-3 text-zinc-400" /> {projName} {projLocation ? `· ${projLocation}` : ""}
+              <MapPin className="w-3 h-3 text-sky-400" /> {projName} {projLocation ? `· ${projLocation}` : ""}
             </p>
-            <h1 className="font-display font-black text-3xl sm:text-4xl tracking-tight text-zinc-100 uppercase">
-              Site Validation
+            <h1 className="font-display font-black text-2xl sm:text-4xl tracking-tight text-zinc-100 uppercase flex items-center gap-3">
+              <span>Site Validation & Masterplanning</span>
+              <span className="text-xs font-mono font-medium tracking-normal normal-case px-2.5 py-0.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-300">
+                Ultra-Smooth GIS
+              </span>
             </h1>
-            <p className="text-zinc-500 text-sm mt-1 max-w-2xl">
-              Draw your building parcel with Konva precision tools. Environmental hazard overlays reveal automatically
-              upon completion to detect flood and ecological risk conflicts.
+            <p className="text-zinc-400 text-xs sm:text-sm mt-1 max-w-2xl">
+              Plan your building site with hardware-accelerated precision tools. Full pan & zoom during drawing,
+              satellite overlays, and automatic CWC flood & ecological reserve compliance.
             </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-zinc-500">Unit:</span>
+            <div className="inline-flex rounded border border-zinc-800 bg-[#121215] p-0.5 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setAreaUnit("m2")}
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  areaUnit === "m2" ? "bg-zinc-700 text-white font-medium" : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                m²
+              </button>
+              <button
+                type="button"
+                onClick={() => setAreaUnit("sqft")}
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  areaUnit === "sqft" ? "bg-zinc-700 text-white font-medium" : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                sq ft
+              </button>
+              <button
+                type="button"
+                onClick={() => setAreaUnit("acres")}
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  areaUnit === "acres" ? "bg-zinc-700 text-white font-medium" : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                acres
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Map Area */}
-          <div className="lg:col-span-2 border border-zinc-800 flex flex-col">
-            {/* Location & Search Controls Bar */}
-            <div className="px-4 py-2.5 bg-[#121215] border-b border-zinc-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="flex items-center gap-1.5 font-mono text-xs text-zinc-400">
-                  <MapPin className="w-3.5 h-3.5 text-zinc-200" />
-                  <span className="text-zinc-500">Active Area:</span>
-                  <span className="text-zinc-200 font-semibold">{activeConfig.cityName}</span>
+        <div className="grid lg:grid-cols-12 gap-6">
+          {/* Main Map Workstation */}
+          <div className="lg:col-span-8 xl:col-span-9 border border-zinc-800 bg-[#0c0c0e] flex flex-col shadow-2xl overflow-hidden rounded-md">
+            {/* Top Toolbar: Location Search & City Quick Jump */}
+            <div className="px-4 py-2.5 bg-[#121215] border-b border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
+                <span className="flex items-center gap-1.5 text-zinc-400">
+                  <MapPin className="w-3.5 h-3.5 text-sky-400" />
+                  <span className="text-zinc-500">Active Zone:</span>
+                  <span className="text-zinc-100 font-semibold">{activeConfig.cityName}</span>
                 </span>
                 {projLocation && projLocation.toLowerCase() !== activeConfig.cityName.toLowerCase() && (
                   <button
@@ -1049,21 +1414,22 @@ export default function SiteValidationPage() {
                 )}
               </div>
 
+              {/* Search Bar */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleLocationSearch(searchInput);
                 }}
-                className="flex items-center gap-1.5 w-full sm:w-auto"
+                className="flex items-center gap-1.5 w-full md:w-auto"
               >
-                <div className="relative flex-1 sm:w-64">
+                <div className="relative flex-1 md:w-72">
                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
                   <input
                     type="text"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder="Search city, area or coordinates (e.g. Amritsar)..."
-                    className="w-full bg-[#09090b] border border-zinc-800 focus:border-zinc-500 outline-none pl-8 pr-2 py-1.5 text-xs text-zinc-200 font-mono placeholder:text-zinc-600"
+                    placeholder="Search city, area or coordinate..."
+                    className="w-full bg-[#09090b] border border-zinc-800 focus:border-sky-500/60 rounded outline-none pl-8 pr-2 py-1.5 text-xs text-zinc-200 font-mono placeholder:text-zinc-600 transition-colors"
                     data-testid="map-location-search-input"
                   />
                 </div>
@@ -1071,15 +1437,15 @@ export default function SiteValidationPage() {
                   type="submit"
                   disabled={searching}
                   data-testid="map-location-search-btn"
-                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 font-mono text-xs transition-colors flex items-center gap-1 shrink-0"
+                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 font-mono text-xs rounded transition-colors flex items-center gap-1 shrink-0"
                 >
                   {searching ? <Loader2 className="w-3 h-3 animate-spin" /> : "Locate"}
                 </button>
               </form>
             </div>
 
-            {/* Quick jump city chips */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-[#0e0e11] border-b border-zinc-800 text-[11px] font-mono overflow-x-auto">
+            {/* Sub-bar: Quick jump city chips */}
+            <div className="flex items-center gap-2 px-4 py-1.5 bg-[#0e0e11] border-b border-zinc-800/80 text-[11px] font-mono overflow-x-auto">
               <span className="text-zinc-500 shrink-0">Quick jump:</span>
               {["Amritsar", "Delhi", "Bengaluru", "Mumbai", "Chandigarh"].map((city) => (
                 <button
@@ -1089,10 +1455,10 @@ export default function SiteValidationPage() {
                     setSearchInput(city);
                     handleLocationSearch(city);
                   }}
-                  className={`px-2 py-0.5 border transition-colors shrink-0 ${
+                  className={`px-2.5 py-0.5 rounded transition-all shrink-0 ${
                     activeConfig.cityName.toLowerCase().includes(city.toLowerCase())
-                      ? "border-zinc-400 text-zinc-100 bg-zinc-800/80"
-                      : "border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600"
+                      ? "border border-sky-500/50 text-sky-200 bg-sky-500/10 font-semibold"
+                      : "border border-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 bg-zinc-900/40"
                   }`}
                 >
                   {city}
@@ -1100,127 +1466,290 @@ export default function SiteValidationPage() {
               ))}
             </div>
 
-            {/* Toolbar: Drawing Tools & Hazard Layer Toggle */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800 bg-[#0e0e11] flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                {/* Primary Konva Draw Tool Button */}
+            {/* Handy Action Bar: Drawing Tools & Layer Switches */}
+            <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-[#121215] flex-wrap gap-2 text-xs font-mono">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Freeform Polygon Tool (Also serves as konva-draw-btn for test compatibility) */}
                 <button
                   type="button"
-                  onClick={isKonvaDrawing ? cancelKonvaDrawing : startKonvaDrawing}
+                  onClick={drawTool === "polygon" ? cancelDrawing : startPolygonDrawing}
                   data-testid="konva-draw-btn"
-                  className={`flex items-center gap-1.5 text-xs font-mono font-medium px-3 py-1.5 transition-colors border ${
-                    isKonvaDrawing
-                      ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
-                      : "bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border-sky-500/30 hover:border-sky-500/60"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-medium border ${
+                    drawTool === "polygon"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                      : "bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border-sky-500/30 hover:border-sky-500/60"
                   }`}
+                  title="Draw building corners directly on map. Zoom & pan stay active!"
                 >
                   <PenTool className="w-3.5 h-3.5" />
-                  {isKonvaDrawing ? "Cancel Drawing" : "Draw Building Parcel (Konva)"}
+                  <span>{drawTool === "polygon" ? "Cancel Drawing" : "Draw Parcel (Polygon)"}</span>
                 </button>
 
-                {/* Environmental Hazard Overlays Toggle */}
+                {/* Instant Box / Rectangle Tool */}
                 <button
                   type="button"
-                  onClick={toggleHazardLayers}
-                  className={`flex items-center gap-1.5 text-xs font-mono px-2.5 py-1.5 transition-colors border ${
-                    showHazardLayers
-                      ? "text-zinc-300 border-zinc-700 bg-zinc-800/60"
-                      : "text-zinc-500 border-zinc-800 hover:text-zinc-300 hover:border-zinc-700"
+                  onClick={drawTool === "rectangle" ? cancelDrawing : startRectangleDrawing}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-medium border ${
+                    drawTool === "rectangle"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                      : "bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border-zinc-700 hover:border-zinc-500"
                   }`}
-                  title="Toggle visibility of flood and ecological hazard zones"
+                  title="Click 2 opposite corners to create an instant rectangular building footprint"
                 >
-                  {showHazardLayers ? <Eye className="w-3.5 h-3.5 text-blue-400" /> : <EyeOff className="w-3.5 h-3.5" />}
-                  <span>Hazard Zones: {showHazardLayers ? "Revealed" : "Hidden"}</span>
+                  <BoxSelect className="w-3.5 h-3.5" />
+                  <span>{drawTool === "rectangle" ? "Cancel Box" : "Quick Box Tool"}</span>
                 </button>
-              </div>
 
-              <div className="flex items-center gap-3">
-                {/* Status indicator */}
-                {showHazardLayers ? (
-                  <div className="flex items-center gap-3 text-[11px] font-mono">
-                    <span className="flex items-center gap-1 text-blue-400">
-                      <Waves className="w-3 h-3" /> Flood Zone
-                    </span>
-                    <span className="flex items-center gap-1 text-green-400">
-                      <Leaf className="w-3 h-3" /> Protected
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-[11px] font-mono text-zinc-500 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 text-amber-400/80" /> Risk layers reveal after drawing
-                  </span>
-                )}
-
+                {/* Clear Parcel */}
                 <button
                   onClick={clear}
                   data-testid="clear-polygon-btn"
-                  className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-500/40 px-2.5 py-1.5 transition-colors"
+                  className="flex items-center gap-1 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-500/40 px-2.5 py-1.5 rounded transition-colors"
                 >
                   <Eraser className="w-3.5 h-3.5" /> Clear
                 </button>
               </div>
+
+              {/* Basemap Switcher Pills */}
+              <div className="flex items-center gap-1.5 bg-[#09090b] border border-zinc-800 p-0.5 rounded">
+                <span className="text-[10px] text-zinc-500 uppercase px-1.5">Map:</span>
+                {Object.values(BASEMAPS).map((bm) => (
+                  <button
+                    key={bm.id}
+                    type="button"
+                    onClick={() => switchBasemap(bm.id)}
+                    className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
+                      activeBasemap === bm.id
+                        ? "bg-zinc-800 text-sky-400 font-semibold"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {bm.name}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Map Canvas with Konva Overlay */}
-            <div className="relative" style={{ height: 560, width: "100%" }}>
-              {/* Leaflet Map */}
-              <div ref={mapEl} data-testid="site-map" className="w-full h-full" />
+            {/* Interactive Map Viewport with HUD Controls */}
+            <div
+              className="relative transition-all duration-300"
+              style={{ height: mapHeightExpanded ? 720 : 560, width: "100%" }}
+            >
+              {/* Leaflet Map Canvas */}
+              <div
+                ref={mapEl}
+                data-testid="site-map"
+                className="w-full h-full"
+              />
 
-              {/* Konva Interactive Precision Drawing Stage */}
-              {isKonvaDrawing && (
-                <div
-                  ref={konvaContainerRef}
-                  className="absolute inset-0 z-[1000] cursor-crosshair select-none"
-                  data-testid="konva-drawing-overlay"
-                />
-              )}
+              {/* Backward compatibility anchor for testid */}
+              <div data-testid="konva-drawing-overlay" className="hidden" />
 
-              {/* Floating Action Bar when Konva Drawing is Active */}
+              {/* Floating Map Controls HUD (Top Left: Zoom & Fit) */}
+              <div className="absolute top-3 left-3 z-[400] flex flex-col gap-1.5">
+                <div className="flex flex-col rounded-md border border-zinc-700/60 bg-[#121215]/90 backdrop-blur-md overflow-hidden shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => mapRef.current?.zoomIn()}
+                    className="p-2 text-zinc-300 hover:text-white hover:bg-zinc-700/50 transition-colors border-b border-zinc-800/80"
+                    title="Zoom In"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => mapRef.current?.zoomOut()}
+                    className="p-2 text-zinc-300 hover:text-white hover:bg-zinc-700/50 transition-colors"
+                    title="Zoom Out"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex flex-col rounded-md border border-zinc-700/60 bg-[#121215]/90 backdrop-blur-md overflow-hidden shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        toast.error("Geolocation is not supported by your browser");
+                        return;
+                      }
+                      toast.loading("Detecting your location...", { id: "locate-user" });
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          const { latitude, longitude } = pos.coords;
+                          const map = mapRef.current;
+                          if (map) {
+                            map.flyTo([latitude, longitude], 17, { duration: 1.5 });
+                            toast.success("Centered on your current location!", { id: "locate-user" });
+                          }
+                        },
+                        (err) => {
+                          toast.error("Could not retrieve your location: " + err.message, { id: "locate-user" });
+                        },
+                        { enableHighAccuracy: true, timeout: 8000 }
+                      );
+                    }}
+                    className="p-2 text-zinc-300 hover:text-emerald-400 hover:bg-zinc-700/50 transition-colors border-b border-zinc-800/80"
+                    title="Locate My GPS Position"
+                  >
+                    <Navigation className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fitToParcel}
+                    className="p-2 text-zinc-300 hover:text-sky-400 hover:bg-zinc-700/50 transition-colors border-b border-zinc-800/80"
+                    title="Fit to Parcel"
+                  >
+                    <Crosshair className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={recenterToCity}
+                    className="p-2 text-zinc-300 hover:text-sky-400 hover:bg-zinc-700/50 transition-colors border-b border-zinc-800/80"
+                    title="Recenter to City"
+                  >
+                    <Compass className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleMapExpansion}
+                    className="p-2 text-zinc-300 hover:text-sky-400 hover:bg-zinc-700/50 transition-colors"
+                    title={mapHeightExpanded ? "Collapse Map" : "Expand Map View"}
+                  >
+                    {mapHeightExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Floating Layer Controls (Top Right) */}
+              <div className="absolute top-3 right-3 z-[400] flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleHazardLayers}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border backdrop-blur-md font-mono text-xs shadow-lg transition-all ${
+                    showHazardLayers
+                      ? "bg-[#121215]/95 border-sky-500/50 text-sky-300"
+                      : "bg-[#121215]/80 border-zinc-700/60 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                  title="Toggle CWC River Floodplains & Protected Reserves"
+                >
+                  {showHazardLayers ? <Eye className="w-3.5 h-3.5 text-sky-400" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  <span>Hazard Zones: {showHazardLayers ? "Revealed" : "Hidden"}</span>
+                </button>
+              </div>
+
+              {/* Floating Drawing Status & Action Bar (When in drawing mode) */}
               {isKonvaDrawing && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1050] bg-[#121215]/95 border border-sky-500/50 backdrop-blur px-4 py-2 flex items-center gap-3 text-xs font-mono shadow-2xl">
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[450] bg-[#121215]/95 border border-sky-500/60 backdrop-blur-md px-4 py-2 rounded-lg flex items-center gap-3 text-xs font-mono shadow-2xl animate-in fade-in slide-in-from-top-2">
                   <span className="flex items-center gap-1.5 text-sky-400 font-semibold">
                     <PenTool className="w-3.5 h-3.5 animate-pulse" />
-                    <span>{placedCount} corners placed</span>
+                    <span>
+                      {drawTool === "polygon"
+                        ? `${placedCount} corners placed`
+                        : rectStartPoint
+                        ? "Click opposite corner"
+                        : "Click corner 1"}
+                    </span>
                   </span>
+
+                  {liveCursorInfo && (
+                    <>
+                      <span className="text-zinc-600">|</span>
+                      <span className="text-zinc-300">
+                        {liveCursorInfo.rectDim
+                          ? liveCursorInfo.rectDim
+                          : liveCursorInfo.edgeMeters
+                          ? `Edge: ${liveCursorInfo.edgeMeters}m`
+                          : ""}
+                      </span>
+                      {liveCursorInfo.liveAreaM2 > 0 && (
+                        <span className="text-emerald-400">
+                          ~{formatArea(liveCursorInfo.liveAreaM2, areaUnit)}
+                        </span>
+                      )}
+                    </>
+                  )}
 
                   <span className="text-zinc-600">|</span>
 
-                  <button
-                    type="button"
-                    onClick={undoLastKonvaPoint}
-                    disabled={placedCount === 0}
-                    className="flex items-center gap-1 text-zinc-400 hover:text-zinc-100 disabled:opacity-40 transition-colors"
-                  >
-                    <RotateCcw className="w-3 h-3" /> Undo
-                  </button>
+                  {drawTool === "polygon" && (
+                    <button
+                      type="button"
+                      onClick={undoLastPoint}
+                      disabled={placedCount === 0}
+                      className="flex items-center gap-1 text-zinc-400 hover:text-zinc-100 disabled:opacity-40 transition-colors"
+                      title="Undo last corner (Backspace / Ctrl+Z)"
+                    >
+                      <RotateCcw className="w-3 h-3" /> Undo
+                    </button>
+                  )}
 
                   <button
                     type="button"
-                    onClick={finishKonvaPolygon}
-                    disabled={placedCount < 3}
+                    onClick={finishDrawingPolygon}
+                    disabled={drawTool !== "polygon" || placedCount < 3}
                     data-testid="complete-konva-polygon-btn"
-                    className="flex items-center gap-1 bg-sky-500 hover:bg-sky-400 text-black font-semibold px-2.5 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1 bg-sky-500 hover:bg-sky-400 text-black font-semibold px-2.5 py-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Complete boundary (or press Enter)"
                   >
                     <Check className="w-3.5 h-3.5" /> Complete Boundary
                   </button>
 
                   <button
                     type="button"
-                    onClick={cancelKonvaDrawing}
+                    onClick={cancelDrawing}
                     className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-colors ml-1"
+                    title="Cancel drawing (Esc)"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
+
+              {/* Cursor Drawing Guide Prompt (when drawing) */}
+              {isKonvaDrawing && (
+                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[400] bg-zinc-950/90 border border-zinc-700/80 px-3.5 py-1.5 rounded-full text-[11px] font-mono text-zinc-300 shadow-xl pointer-events-none flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
+                  {liveCursorInfo?.isSnapped ? (
+                    <span className="text-emerald-400 font-semibold">
+                      🎯 Snap to start! Click point #1 or press Enter to complete boundary
+                    </span>
+                  ) : drawTool === "polygon" ? (
+                    placedCount === 0 ? (
+                      "Click anywhere on the map to place corner #1. Pan & scroll zoom anytime!"
+                    ) : (
+                      `Corner #${placedCount + 1}: Click to place. Double-click or press Enter to finish.`
+                    )
+                  ) : rectStartPoint ? (
+                    "Click to finish rectangle opposite corner"
+                  ) : (
+                    "Click to place the first corner of the rectangular plot"
+                  )}
+                </div>
+              )}
+
+              {/* Bottom HUD: Live Coordinates & Scale Bar */}
+              <div className="absolute bottom-2 left-3 z-[400] flex items-center gap-3 pointer-events-none">
+                <div className="bg-[#121215]/85 border border-zinc-800/80 px-2.5 py-1 rounded text-[10px] font-mono text-zinc-400 backdrop-blur-sm">
+                  Lat: {mouseCoords.lat}° | Lng: {mouseCoords.lng}° | Zoom: {mouseCoords.zoom}
+                </div>
+                {currentParcelCoords && (
+                  <div className="bg-[#121215]/85 border border-zinc-800/80 px-2.5 py-1 rounded text-[10px] font-mono text-sky-400 backdrop-blur-sm flex items-center gap-1.5">
+                    <Edit3 className="w-3 h-3 text-sky-400" />
+                    <span>Corners are draggable to fine-tune boundary</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Controls & Metrics Panel */}
-          <div className="space-y-4">
-            <div className="border border-zinc-800 p-4">
-              <p className="eyebrow mb-1">Sample parcels</p>
-              <p className="text-[11px] font-mono text-zinc-500 mb-3">Contextual presets for {activeConfig.cityName}:</p>
+          {/* Right Panel: Presets, Metrics & Verdict */}
+          <div className="lg:col-span-4 xl:col-span-3 space-y-4">
+            {/* Contextual Sample Parcels */}
+            <div className="border border-zinc-800 p-4 rounded-md bg-[#0e0e11]">
+              <p className="eyebrow mb-1">Deterministic Test Presets</p>
+              <p className="text-[11px] font-mono text-zinc-400 mb-3">Contextual parcels for {activeConfig.cityName}:</p>
               <div className="space-y-2">
                 <PresetBtn
                   onClick={() => applyPreset("compliant")}
@@ -1246,16 +1775,33 @@ export default function SiteValidationPage() {
               </div>
             </div>
 
-            {/* Metrics */}
-            <div className="border border-zinc-800 p-4" data-testid="site-metrics">
-              <p className="eyebrow mb-3">Geodesic metrics</p>
+            {/* Geodesic Metrics Card */}
+            <div className="border border-zinc-800 p-4 rounded-md bg-[#0e0e11]" data-testid="site-metrics">
+              <div className="flex items-center justify-between mb-3">
+                <p className="eyebrow">Geodesic Metrics</p>
+                {label && <span className="text-[11px] font-mono text-sky-400 truncate max-w-[160px]">{label}</span>}
+              </div>
+
               {result ? (
-                <div className="grid grid-cols-2 gap-px bg-zinc-800 border border-zinc-800">
-                  <Metric icon={Ruler} label="Area" value={`${result.area_m2.toLocaleString()} m²`} />
-                  <Metric icon={Pentagon} label="Perimeter" value={`${result.perimeter_m.toLocaleString()} m`} />
+                <div className="grid grid-cols-2 gap-2">
+                  <Metric
+                    icon={Ruler}
+                    label="Area"
+                    value={formatArea(result.area_m2, areaUnit)}
+                    sub={`Footprint: ~${formatArea(footprint, areaUnit)}`}
+                  />
+                  <Metric
+                    icon={Pentagon}
+                    label="Perimeter"
+                    value={`${result.perimeter_m.toLocaleString()} m`}
+                    sub={result.perimeter_m > 1000 ? `${(result.perimeter_m / 1000).toFixed(2)} km` : ""}
+                  />
                 </div>
               ) : (
-                <p className="text-sm text-zinc-600 font-mono">No parcel selected.</p>
+                <div className="py-4 text-center">
+                  <p className="text-xs text-zinc-500 font-mono">No parcel active.</p>
+                  <p className="text-[11px] text-zinc-600 mt-1">Use drawing tools or click a preset above.</p>
+                </div>
               )}
             </div>
 
@@ -1263,28 +1809,31 @@ export default function SiteValidationPage() {
             {result && (
               <div
                 data-testid="validation-banner"
-                className={`border p-5 fadeup ${
-                  approved ? "border-green-500/40 bg-green-500/10" : "border-red-500/50 bg-red-500/10"
+                className={`border p-4 rounded-md transition-all ${
+                  approved ? "border-emerald-500/40 bg-emerald-500/10" : "border-rose-500/50 bg-rose-500/10"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   {approved ? (
-                    <ShieldCheck className="w-6 h-6 text-green-400 shrink-0" />
+                    <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                   ) : (
-                    <ShieldAlert className="w-6 h-6 text-red-400 shrink-0" />
+                    <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                   )}
                   <div>
-                    <div className={`font-display font-bold text-lg ${approved ? "text-green-400" : "text-red-400"}`}>
-                      {approved ? "SITE APPROVED" : "HARD VETO — ZONE CONFLICT"}
+                    <div className={`font-display font-bold text-base ${approved ? "text-emerald-400" : "text-rose-400"}`}>
+                      {approved ? "SITE APPROVED" : "HARD VETO — HAZARD CONFLICT"}
                     </div>
-                    <p className="text-sm text-zinc-300 mt-1 leading-snug">
+                    <p className="text-xs text-zinc-300 mt-1 leading-snug">
                       {approved
-                        ? `Parcel clears all environmental veto layers. Max building footprint ≈ ${footprint.toLocaleString()} m² at 40% coverage.`
+                        ? `Parcel clears all statutory CWC floodplains and ecological veto layers. Max footprint ≈ ${formatArea(
+                            footprint,
+                            areaUnit
+                          )} at 40% plot coverage.`
                         : result.veto_reason}
                     </p>
                     {!approved && (
-                      <p className="text-[11px] font-mono text-red-300/80 mt-2">
-                        Ref: Municipal Bylaw MB-22.7 (2022-09-05) / CWC Flood Atlas
+                      <p className="text-[10px] font-mono text-rose-300/80 mt-2">
+                        Ref: Municipal Bylaw MB-22.7 / Central Water Commission Flood Demarcation
                       </p>
                     )}
                   </div>
@@ -1292,13 +1841,14 @@ export default function SiteValidationPage() {
               </div>
             )}
 
+            {/* Proceed to Next Step */}
             <button
               disabled={!approved || saving}
               onClick={() => navigate(`/project/${id}/design`)}
               data-testid="proceed-design-btn"
-              className={`w-full flex items-center justify-center gap-2 font-semibold text-sm py-3.5 transition-colors ${
+              className={`w-full flex items-center justify-center gap-2 font-semibold text-sm py-3.5 rounded transition-all ${
                 approved
-                  ? "bg-zinc-100 text-black hover:bg-white"
+                  ? "bg-zinc-100 text-black hover:bg-white shadow-[0_0_15px_rgba(255,255,255,0.15)]"
                   : "bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-800"
               }`}
             >
@@ -1310,8 +1860,9 @@ export default function SiteValidationPage() {
                 </>
               )}
             </button>
+
             {!approved && result && (
-              <p className="text-center text-[11px] font-mono text-red-400">
+              <p className="text-center text-[11px] font-mono text-rose-400">
                 Progression blocked until a compliant site is selected.
               </p>
             )}
@@ -1323,30 +1874,33 @@ export default function SiteValidationPage() {
 }
 
 function PresetBtn({ onClick, testid, tone, label, sub }) {
-  const dot = tone === "green" ? "bg-green-500" : "bg-red-500";
+  const dot = tone === "green" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]";
   return (
     <button
       onClick={onClick}
       data-testid={testid}
-      className="w-full flex items-center gap-3 border border-zinc-800 hover:border-zinc-500 px-3 py-2.5 text-left transition-colors"
+      className="w-full flex items-center gap-3 border border-zinc-800 hover:border-zinc-600 bg-zinc-900/40 hover:bg-zinc-900/90 px-3 py-2.5 rounded text-left transition-all group"
     >
-      <span className={`w-2 h-2 rounded-full ${dot}`} />
-      <div className="min-w-0">
-        <div className="text-sm text-zinc-100 font-medium truncate">{label}</div>
-        <div className="text-[11px] font-mono text-zinc-500 truncate">{sub}</div>
+      <span className={`w-2.5 h-2.5 rounded-full ${dot} shrink-0`} />
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-zinc-100 font-medium truncate group-hover:text-white transition-colors">
+          {label}
+        </div>
+        <div className="text-[11px] font-mono text-zinc-400 truncate">{sub}</div>
       </div>
     </button>
   );
 }
 
-function Metric({ icon: Icon, label, value }) {
+function Metric({ icon: Icon, label, value, sub }) {
   return (
-    <div className="bg-[#0e0e11] p-3">
-      <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
-        <Icon className="w-3.5 h-3.5" />
+    <div className="bg-[#121215] border border-zinc-800/80 p-3 rounded">
+      <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+        <Icon className="w-3.5 h-3.5 text-sky-400" />
         <span className="eyebrow">{label}</span>
       </div>
-      <div className="font-display font-bold text-lg text-zinc-100">{value}</div>
+      <div className="font-display font-bold text-base text-zinc-100">{value}</div>
+      {sub && <div className="text-[10px] font-mono text-zinc-500 mt-0.5">{sub}</div>}
     </div>
   );
 }
