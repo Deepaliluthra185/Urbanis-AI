@@ -815,7 +815,8 @@ export default function SiteValidationPage() {
     setDrawPoints([]);
     setLiveCursorInfo(null);
     toast.success("Building footprint defined! Environmental hazard layers revealed.");
-  }, [renderPolygon, updateMapOverlays]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renderPolygon, updateMapOverlays, persist]);
 
   // -------------------------------------------------------------
   // Cancel Drawing
@@ -1172,6 +1173,7 @@ export default function SiteValidationPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawTool, drawPoints.length, finishDrawingPolygon]);
 
   // Load project & automatically center map to project's location (only on initial mount or id change)

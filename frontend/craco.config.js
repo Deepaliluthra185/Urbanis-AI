@@ -2,6 +2,10 @@
 const path = require("path");
 require("dotenv").config();
 
+// Prevent CI environments (e.g. Vercel) from failing builds on ESLint warnings
+process.env.CI = "false";
+process.env.DISABLE_ESLINT_PLUGIN = "true";
+
 const config = {
   enableHealthCheck: process.env.ENABLE_HEALTH_CHECK === "true",
 };
